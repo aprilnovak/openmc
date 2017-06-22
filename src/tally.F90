@@ -8,7 +8,8 @@ module tally
   use error,            only: fatal_error
   use geometry_header
   use global
-  use math,             only: t_percentile, calc_pn, calc_rn
+  use math,             only: t_percentile, calc_pn, calc_rn, &
+                              calc_zn
   use mesh,             only: get_mesh_bin, bin_to_mesh_indices, &
                               get_mesh_indices, mesh_indices_to_bin, &
                               mesh_intersects_1d, mesh_intersects_2d, &
@@ -968,7 +969,7 @@ contains
           end if
         end if
 
-      case (SCORE_KAPPA_FISSION)
+      case (SCORE_KAPPA_FISSION, SCORE_KAPPA_FISSION_ZN)
         ! Determine kappa-fission cross section on the fly. The ENDF standard
         ! (ENDF-102) states that MT 18 stores the fission energy as the Q_value
         ! (fission(1))
@@ -2103,10 +2104,11 @@ contains
     integer,           intent(in)    :: score_bin    ! score of concern
     real(8),           intent(inout) :: score        ! data to score
     integer,           intent(inout) :: i            ! Working index
-
+    integer :: z                    ! loop index for zernike
     integer :: num_nm ! Number of N,M orders in harmonic
     integer :: n      ! Moment loop index
     real(8) :: uvw(3)
+    real(8) :: norm_pos1, norm_pos2 ! normalized positions for polynomial tallies
 
     select case(score_bin)
     case (SCORE_SCATTER_N, SCORE_NU_SCATTER_N)
@@ -2188,6 +2190,32 @@ contains
       end do
       i = i + t % moment_order(i)
 
+    case (SCORE_KAPPA_FISSION_ZN)
+      score_index = score_index - 1
+      num_nm = 1
+
+      ! Calculate normalized positions
+      call get_polynomial_norm_positions(p % coord(p % n_coord), t % fet_geom_norm, norm_pos1, &
+           norm_pos2, SCORE_KAPPA_FISSION_ZN)
+
+      ! Loop over each moment and score the contribution of each moment
+      ! in the appropriate bin
+      z = 0
+      do n = 0, t % moment_order(i)
+        ! Determine scoring bin index
+        score_index = score_index + num_nm
+        ! Update number of total n,m bins for this n
+        num_nm =  n + 1
+        z = z + num_nm
+        ! multiply score by the zernike moments and store
+!$omp critical
+        t % results(score_index: score_index + num_nm - 1, filter_index) % value = &
+             t % results(score_index: score_index + num_nm - 1, filter_index) % value + &
+             score * calc_zn(n, norm_pos1, norm_pos2)
+!$omp end critical
+      end do
+      ! Advance bin counter by the number of coefficinets minus one for later update
+      i = i + z - 1
 
     case default
 !$omp atomic
@@ -4429,5 +4457,35 @@ contains
     call active_current_tallies % shrink_to_fit()
 
   end subroutine setup_active_cmfdtallies
+
+!==============================================================================
+! GET_POLYNOMIAL_NORM_POSITIONS gets the normalized polynomial positions
+! for a given set of coordinates
+!==============================================================================
+
+  subroutine get_polynomial_norm_positions(coord, geom_norms, &
+        norm_pos1, norm_pos2, score_type)
+
+    type(LocalCoord), intent(in) :: coord    ! mphysics coord level
+    real(8), dimension(:), intent(in) :: geom_norms    ! Geometric norms for calculation
+    real(8), intent(inout) :: norm_pos1 ! Normalized positions for tally
+    real(8), intent(inout) :: norm_pos2 ! Normalized positions for tally
+    integer, intent(in) :: score_type   ! Constant for the tally score type
+
+    select case (score_type)
+    case (SCORE_KAPPA_FISSION_ZN)
+       norm_pos1 = sqrt( coord % xyz(1) * coord % xyz(1) + &
+            coord % xyz(2) * coord % xyz(2) ) / geom_norms(1)
+       norm_pos2 = atan( coord % xyz(2) / coord % xyz(1) )
+       if ( norm_pos2 < 0.0 .AND. coord % xyz(1) < 0.0) then
+          ! Need to shift to second quadrant
+          norm_pos2 = norm_pos2 - PI
+       else if ( norm_pos2 > 0.0 .AND. coord % xyz(1) < 0.0) then
+          ! Need to shift to third quadrant
+          norm_pos2 = norm_pos2 + PI
+       endif
+    end select
+
+  end subroutine get_polynomial_norm_positions
 
 end module tally

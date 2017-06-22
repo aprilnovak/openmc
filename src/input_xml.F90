@@ -2659,6 +2659,7 @@ contains
     integer :: imomstr       ! Index of MOMENT_STRS & MOMENT_N_STRS
     logical :: file_exists   ! does tallies.xml file exist?
     real(8) :: rarray3(3)    ! temporary double prec. array
+    integer :: n_fet_norms   ! number of geometric norms for FET
     integer :: Nangle        ! Number of angular bins
     real(8) :: dangle        ! Mu spacing if using automatic allocation
     integer :: iangle        ! Loop counter for building mu filter bins
@@ -3556,8 +3557,11 @@ contains
                      // trim(to_str(MAX_ANG_ORDER))
               end if
               ! Find total number of bins for this case
-              if (imomstr >= YN_LOC) then
+              ! Find total number of bins for this case
+              if (imomstr >= YN_LOC .AND. imomstr < ZN_LOC) then
                 n_bins = (n_order + 1)**2
+              else if (imomstr >= ZN_LOC) then
+                n_bins = n_order * ( n_order + 1 ) / 2 + n_order + 1
               else
                 n_bins = n_order + 1
               end if
@@ -3595,8 +3599,10 @@ contains
               end if
               score_name = trim(MOMENT_STRS(imomstr)) // "n"
               ! Find total number of bins for this case
-              if (imomstr >= YN_LOC) then
+              if (imomstr >= YN_LOC .AND. imomstr < ZN_LOC) then
                 n_bins = (n_order + 1)**2
+              else if (imomstr >= ZN_LOC) then
+                n_bins = n_order * ( n_order + 1 ) / 2 + n_order + 1
               else
                 n_bins = n_order + 1
               end if
@@ -3742,6 +3748,19 @@ contains
             t % score_bins(j : j + n_bins - 1) = SCORE_SCATTER_YN
             t % moment_order(j : j + n_bins - 1) = n_order
             j = j + n_bins - 1
+
+          case ('kappa-fission-zn')
+            t % estimator = ESTIMATOR_ANALOG
+            t % score_bins(j : j + n_bins - 1) = SCORE_KAPPA_FISSION_ZN
+            t % moment_order(j : j + n_bins - 1) = n_order
+            j = j + n_bins - 1
+            n_fet_norms = get_arraysize_string(node_tal, "geom_norms")
+            if(n_fet_norms .NE. 1) then
+               call fatal_error('Expecting one value for geometric' &
+                    &// 'norm of Zernike kappa-fission tally')
+            endif
+            allocate(t % fet_geom_norm(n_fet_norms))
+            call get_node_array(node_tal, "geom_norms", t % fet_geom_norm)
 
           case ('nu-scatter-yn')
             t % estimator = ESTIMATOR_ANALOG
@@ -4019,6 +4038,8 @@ contains
           case (SCORE_FLUX_YN, SCORE_TOTAL_YN, SCORE_SCATTER_YN, &
                SCORE_NU_SCATTER_YN)
             n_bins = (n_order + 1)**2
+          case (SCORE_KAPPA_FISSION_ZN)
+            n_bins = (n_order+1)*(n_order+2)/2
           case default
             n_bins = 1
           end select
