@@ -2208,8 +2208,8 @@ contains
         z = z + num_nm
         ! multiply score by the zernike moments and store
 !$omp critical
-        t % results(score_index: score_index + num_nm - 1, filter_index) % value = &
-             t % results(score_index: score_index + num_nm - 1, filter_index) % value + &
+        t % results(RESULT_VALUE, score_index: score_index + num_nm - 1, filter_index) = &
+             t % results(RESULT_VALUE, score_index: score_index + num_nm - 1, filter_index) + &
              score * calc_zn(n, norm_pos1, norm_pos2)
 !$omp end critical
       end do

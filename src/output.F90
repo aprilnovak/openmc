@@ -958,10 +958,10 @@ contains
                   score_index = score_index + 1
                   score_name = 'Z' // trim(to_str(n_order)) // ',' // &
                        trim(to_str(nm_order)) // " " // score_names(abs(t % score_bins(k)))
+                  x(:) = mean_stdev(r(:, score_index, filter_index), nr)
                   write(UNIT=UNIT_TALLY, FMT='(1X,2A,1X,A,"+/- ",A)') &
-                    repeat(" ", indent), score_name, &
-                    to_str(t % results(score_index,filter_index) % sum), &
-                    trim(to_str(t % results(score_index,filter_index) % sum_sq))
+                       repeat(" ", indent), score_name, to_str(x(1)), &
+                       trim(to_str(t_value * x(2)))
                 end do
               end do
               k = k + z
