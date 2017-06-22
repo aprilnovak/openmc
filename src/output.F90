@@ -949,14 +949,12 @@ contains
               end do
               k = k + (t % moment_order(k) + 1)**2 - 1
             case (SCORE_KAPPA_FISSION_ZN)
-              z = 0;
+              z = 0
               score_index = score_index - 1
               do n_order = 0, t % moment_order(k)
                 z = z + n_order + 1
                 do nm_order = -n_order, n_order
-                  if ( MOD(n_order - nm_order,2) .NE. 0) then
-                     cycle
-                  endif
+                  if (mod(n_order - nm_order, 2) /= 0) cycle
                   score_index = score_index + 1
                   score_name = 'Z' // trim(to_str(n_order)) // ',' // &
                        trim(to_str(nm_order)) // " " // score_names(abs(t % score_bins(k)))

@@ -8,8 +8,7 @@ module tally
   use error,            only: fatal_error
   use geometry_header
   use global
-  use math,             only: t_percentile, calc_pn, calc_rn, &
-                              calc_zn
+  use math,             only: t_percentile, calc_pn, calc_rn, calc_zn
   use mesh,             only: get_mesh_bin, bin_to_mesh_indices, &
                               get_mesh_indices, mesh_indices_to_bin, &
                               mesh_intersects_1d, mesh_intersects_2d, &
@@ -4463,8 +4462,8 @@ contains
 ! for a given set of coordinates
 !==============================================================================
 
-  subroutine get_polynomial_norm_positions(coord, geom_norms, &
-        norm_pos1, norm_pos2, score_type)
+  subroutine get_polynomial_norm_positions(coord, geom_norms, norm_pos1, &
+       norm_pos2, score_type)
 
     type(LocalCoord), intent(in) :: coord    ! mphysics coord level
     real(8), dimension(:), intent(in) :: geom_norms    ! Geometric norms for calculation
@@ -4474,16 +4473,16 @@ contains
 
     select case (score_type)
     case (SCORE_KAPPA_FISSION_ZN)
-       norm_pos1 = sqrt( coord % xyz(1) * coord % xyz(1) + &
-            coord % xyz(2) * coord % xyz(2) ) / geom_norms(1)
-       norm_pos2 = atan( coord % xyz(2) / coord % xyz(1) )
-       if ( norm_pos2 < 0.0 .AND. coord % xyz(1) < 0.0) then
-          ! Need to shift to second quadrant
-          norm_pos2 = norm_pos2 - PI
-       else if ( norm_pos2 > 0.0 .AND. coord % xyz(1) < 0.0) then
-          ! Need to shift to third quadrant
-          norm_pos2 = norm_pos2 + PI
-       endif
+      norm_pos1 = sqrt(coord % xyz(1) * coord % xyz(1) + &
+           coord % xyz(2) * coord % xyz(2)) / geom_norms(1)
+      norm_pos2 = atan(coord % xyz(2) / coord % xyz(1))
+      if (norm_pos2 < ZERO .and. coord % xyz(1) < ZERO) then
+        ! Need to shift to second quadrant
+        norm_pos2 = norm_pos2 - PI
+      else if (norm_pos2 > ZERO .and. coord % xyz(1) < ZERO) then
+        ! Need to shift to third quadrant
+        norm_pos2 = norm_pos2 + PI
+      end if
     end select
 
   end subroutine get_polynomial_norm_positions

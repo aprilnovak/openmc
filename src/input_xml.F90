@@ -3558,7 +3558,7 @@ contains
               end if
               ! Find total number of bins for this case
               ! Find total number of bins for this case
-              if (imomstr >= YN_LOC .AND. imomstr < ZN_LOC) then
+              if (imomstr >= YN_LOC .and. imomstr < ZN_LOC) then
                 n_bins = (n_order + 1)**2
               else if (imomstr >= ZN_LOC) then
                 n_bins = n_order * ( n_order + 1 ) / 2 + n_order + 1
@@ -3599,7 +3599,7 @@ contains
               end if
               score_name = trim(MOMENT_STRS(imomstr)) // "n"
               ! Find total number of bins for this case
-              if (imomstr >= YN_LOC .AND. imomstr < ZN_LOC) then
+              if (imomstr >= YN_LOC .and. imomstr < ZN_LOC) then
                 n_bins = (n_order + 1)**2
               else if (imomstr >= ZN_LOC) then
                 n_bins = n_order * ( n_order + 1 ) / 2 + n_order + 1
@@ -3755,10 +3755,10 @@ contains
             t % moment_order(j : j + n_bins - 1) = n_order
             j = j + n_bins - 1
             n_fet_norms = get_arraysize_string(node_tal, "geom_norms")
-            if(n_fet_norms .NE. 1) then
-               call fatal_error('Expecting one value for geometric' &
-                    &// 'norm of Zernike kappa-fission tally')
-            endif
+            if (n_fet_norms /= 1) then
+              call fatal_error('Expecting one value for geometric norm of &
+                   &Zernike kappa-fission tally.')
+            end if
             allocate(t % fet_geom_norm(n_fet_norms))
             call get_node_array(node_tal, "geom_norms", t % fet_geom_norm)
 
