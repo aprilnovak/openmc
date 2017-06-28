@@ -2105,10 +2105,12 @@ contains
     real(8),           intent(inout) :: score        ! data to score
     integer,           intent(inout) :: i            ! Working index
     integer :: z                    ! loop index for zernike
-    integer :: num_nm ! Number of N,M orders in harmonic
-    integer :: n      ! Moment loop index
+    integer :: num_nm               ! Number of N,M orders in harmonic
+    integer :: n                    ! Moment loop index
     real(8) :: uvw(3)
-    real(8) :: norm_pos1, norm_pos2 ! normalized positions for polynomial tallies
+    real(8) :: norm_r               ! normalized r-coordinate 
+    real(8) :: norm_theta           ! normalized theta-coordinate
+    real(8) :: norm_z               ! normalied z-coordinate
 
     select case(score_bin)
     case (SCORE_SCATTER_N, SCORE_NU_SCATTER_N)
@@ -2195,7 +2197,8 @@ contains
       num_nm = 1
 
       ! Calculate normalized positions
-      call get_polynomial_norm_positions(p, norm_pos1, norm_pos2, SCORE_KAPPA_FISSION_ZN)
+      call get_polynomial_norm_positions(p, norm_r, norm_theta, &
+        norm_z, SCORE_KAPPA_FISSION_ZN)
 
       ! Loop over each moment and score the contribution of each moment
       ! in the appropriate bin
@@ -2210,7 +2213,7 @@ contains
 !$omp critical
         t % results(RESULT_VALUE, score_index: score_index + num_nm - 1, filter_index) = &
              t % results(RESULT_VALUE, score_index: score_index + num_nm - 1, filter_index) + &
-             score * calc_zn_scaled(n, norm_pos1, norm_pos2)
+             score * calc_zn_scaled(n, norm_r, norm_theta)
 !$omp end critical
       end do
       ! Advance bin counter by the number of coefficinets minus one for later update
@@ -4462,23 +4465,23 @@ contains
 ! for a given particle using the particle's cell and its global coordinates.
 !==============================================================================
 
-  subroutine get_polynomial_norm_positions(p, norm_pos1, norm_pos2, score_type)
+  subroutine get_polynomial_norm_positions(p, norm_r, norm_theta, &
+    norm_z, score_type)
 
-    type(Particle), intent(in) :: p     ! particle scorind to tally
-    real(8), intent(inout) :: norm_pos1 ! Normalized positions for tally
-    real(8), intent(inout) :: norm_pos2 ! Normalized positions for tally
-    integer, intent(in) :: score_type   ! Constant for the tally score type
+    type(Particle), intent(in) :: p      ! particle scorind to tally
+    real(8), intent(inout) :: norm_r     ! Normalized radial coordinate
+    real(8), intent(inout) :: norm_theta ! Normalized theta coordinate
+    real(8), intent(inout) :: norm_z     ! Normalized z coordinate
+    integer, intent(in) :: score_type    ! Constant for the tally score type
 
-    integer :: i                        ! Looping variable
-    integer :: j                        ! Looping variable
-    integer :: cell_id                  ! ID of the particle's cell
-    real(8) :: center(2)                ! global coordinates of cyl center
-    real(8) :: radius                   ! radius of cylinder
-    real(8) :: heights(2)               ! (min, max) of cylinder height
-    class(Surface), pointer :: s
-
-    real(8) :: x_norm                   ! normalized x position
-    real(8) :: y_norm                   ! normalized y position
+    integer :: i                         ! Looping variable
+    integer :: j                         ! Looping variable
+    integer :: cell_id                   ! ID of the particle's cell
+    real(8) :: center(2)                 ! global coordinates of cyl center
+    real(8) :: radius                    ! radius of cylinder
+    real(8) :: heights(2)                ! (min, max) of cylinder height
+    real(8) :: norm_x                    ! normalized x position
+    real(8) :: norm_y                    ! normalized y position
 
     ! Cell ID of particle
     cell_id = p % coord(1) % cell
@@ -4489,8 +4492,7 @@ contains
     ! the cylinder for normalization.
     j = 1
     do i = 1, size(cells(cell_id) % region)
-      s => surfaces(abs(cells(cell_id) % region(i))) % obj
-      select type(s)
+      select type(s => surfaces(abs(cells(cell_id) % region(i))) % obj)
         type is (SurfaceZCylinder)
           ! read geometric info about cylinder
           center(1) = s % x0
@@ -4508,13 +4510,13 @@ contains
     end do
 
     ! compute normalized coordinates.
-    x_norm = p % coord(1) % xyz(1) - center(1)
-    y_norm = p % coord(1) % xyz(2) - center(2)
+    norm_x = p % coord(1) % xyz(1) - center(1)
+    norm_y = p % coord(1) % xyz(2) - center(2)
 
     select case (score_type)
     case (SCORE_KAPPA_FISSION_ZN)
-      norm_pos1 = sqrt(x_norm * x_norm + y_norm * y_norm) / radius
-      norm_pos2 = atan2(y_norm, x_norm)
+      norm_r = sqrt(norm_x * norm_x + norm_y * norm_y) / radius
+      norm_theta = atan2(norm_y, norm_x)
     end select
   end subroutine get_polynomial_norm_positions
 
