@@ -603,7 +603,7 @@ contains
     real(8), intent(in) :: rho         ! Radial location in the unit disk
     real(8), intent(in) :: phi         ! Theta (radians) location in the unit disk
     real(8)             :: zn(n + 1)   ! The resultant Z_n(uvw)
-    ! Right now this is only in 2D.
+    
     ! n == radial degree
     ! m == azimuthal frequency
 
@@ -1727,6 +1727,23 @@ contains
     end select
 
   end function calc_zn
+
+!===============================================================================
+! CALC_ZN_SCALED calculates the n-th order Zernike polynomial moment for a given 
+! angle (rho, theta) location in the unit disk, scaled correctly for orthogonal
+! integration.
+!===============================================================================
+
+  pure function calc_zn_scaled(n, rho, phi) result(zn)
+
+    integer, intent(in) :: n           ! Order requested
+    real(8), intent(in) :: rho         ! Radial location in the unit disk
+    real(8), intent(in) :: phi         ! Theta (radians) location in the unit disk
+    real(8)             :: zn(n + 1)   ! The resultant Z_n(uvw)
+
+    zn = calc_zn(n, rho, phi) / SQRT_PI
+
+  end function calc_zn_scaled
 
 !===============================================================================
 ! EXPAND_HARMONIC expands a given series of real spherical harmonics
