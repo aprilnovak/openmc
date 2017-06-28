@@ -8,7 +8,7 @@ module tally
   use error,            only: fatal_error
   use geometry_header
   use global
-  use math,             only: t_percentile, calc_pn, calc_rn, calc_zn
+  use math,             only: t_percentile, calc_pn, calc_rn, calc_zn_scaled
   use mesh,             only: get_mesh_bin, bin_to_mesh_indices, &
                               get_mesh_indices, mesh_indices_to_bin, &
                               mesh_intersects_1d, mesh_intersects_2d, &
@@ -2210,7 +2210,7 @@ contains
 !$omp critical
         t % results(RESULT_VALUE, score_index: score_index + num_nm - 1, filter_index) = &
              t % results(RESULT_VALUE, score_index: score_index + num_nm - 1, filter_index) + &
-             score * calc_zn(n, norm_pos1, norm_pos2)
+             score * calc_zn_scaled(n, norm_pos1, norm_pos2)
 !$omp end critical
       end do
       ! Advance bin counter by the number of coefficinets minus one for later update
