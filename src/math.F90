@@ -194,7 +194,7 @@ contains
                                ! evaluated at; x must be in the domain [-1,1]
     real(8)             :: pnx ! The Legendre poly of order n evaluated at x
 
-    pnx = calc_pn(n, x) * sqrt((2.0 * n + 1.0) / 2.0)
+    pnx = calc_pn(n, x) * sqrt((TWO * n + ONE) / TWO)
 
   end function calc_pn_scaled
 
