@@ -181,6 +181,24 @@ contains
   end function calc_pn
 
 !===============================================================================
+! CALC_PN_SCALED calculates the n-th order Legendre polynomial at the value of 
+! x, where the Legendre polynomial is scaled by a factor such that when 
+! integrating over the orthogonal domain [-1, 1], the orthogonality condition
+! simply gives the delta function. 
+!===============================================================================
+
+  elemental function calc_pn_scaled(n,x) result(pnx)
+
+    integer, intent(in) :: n   ! Legendre order requested
+    real(8), intent(in) :: x   ! Independent variable the Legendre is to be
+                               ! evaluated at; x must be in the domain [-1,1]
+    real(8)             :: pnx ! The Legendre poly of order n evaluated at x
+
+    pnx = calc_pn(n, x) * sqrt((2.0 * n + 1.0) / 2.0)
+
+  end function calc_pn_scaled
+
+!===============================================================================
 ! CALC_RN calculates the n-th order spherical harmonics for a given angle
 ! (in terms of (u,v,w)).  All Rn,m values are provided (where -n<=m<=n)
 !===============================================================================
