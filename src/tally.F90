@@ -8,7 +8,7 @@ module tally
   use error,            only: fatal_error
   use geometry_header
   use global
-  use math,             only: t_percentile, calc_pn, calc_rn, calc_zn
+  use math,             only: t_percentile, calc_pn, calc_rn, calc_zn_scaled
   use mesh,             only: get_mesh_bin, bin_to_mesh_indices, &
                               get_mesh_indices, mesh_indices_to_bin, &
                               mesh_intersects_1d, mesh_intersects_2d, &
@@ -18,6 +18,7 @@ module tally
   use output,           only: header
   use particle_header,  only: LocalCoord, Particle
   use string,           only: to_str
+  use surface_header
   use tally_filter
 
   implicit none
@@ -2104,10 +2105,12 @@ contains
     real(8),           intent(inout) :: score        ! data to score
     integer,           intent(inout) :: i            ! Working index
     integer :: z                    ! loop index for zernike
-    integer :: num_nm ! Number of N,M orders in harmonic
-    integer :: n      ! Moment loop index
+    integer :: num_nm               ! Number of N,M orders in harmonic
+    integer :: n                    ! Moment loop index
     real(8) :: uvw(3)
-    real(8) :: norm_pos1, norm_pos2 ! normalized positions for polynomial tallies
+    real(8) :: norm_r               ! normalized r-coordinate 
+    real(8) :: norm_theta           ! normalized theta-coordinate
+    real(8) :: norm_z               ! normalied z-coordinate
 
     select case(score_bin)
     case (SCORE_SCATTER_N, SCORE_NU_SCATTER_N)
@@ -2194,8 +2197,8 @@ contains
       num_nm = 1
 
       ! Calculate normalized positions
-      call get_polynomial_norm_positions(p % coord(p % n_coord), t % fet_geom_norm, norm_pos1, &
-           norm_pos2, SCORE_KAPPA_FISSION_ZN)
+      call get_polynomial_norm_positions(p, norm_r, norm_theta, &
+        norm_z, SCORE_KAPPA_FISSION_ZN)
 
       ! Loop over each moment and score the contribution of each moment
       ! in the appropriate bin
@@ -2210,7 +2213,7 @@ contains
 !$omp critical
         t % results(RESULT_VALUE, score_index: score_index + num_nm - 1, filter_index) = &
              t % results(RESULT_VALUE, score_index: score_index + num_nm - 1, filter_index) + &
-             score * calc_zn(n, norm_pos1, norm_pos2)
+             score * calc_zn_scaled(n, norm_r, norm_theta)
 !$omp end critical
       end do
       ! Advance bin counter by the number of coefficinets minus one for later update
@@ -4459,32 +4462,62 @@ contains
 
 !==============================================================================
 ! GET_POLYNOMIAL_NORM_POSITIONS gets the normalized polynomial positions
-! for a given set of coordinates
+! for a given particle using the particle's cell and its global coordinates.
 !==============================================================================
 
-  subroutine get_polynomial_norm_positions(coord, geom_norms, norm_pos1, &
-       norm_pos2, score_type)
+  subroutine get_polynomial_norm_positions(p, norm_r, norm_theta, &
+    norm_z, score_type)
 
-    type(LocalCoord), intent(in) :: coord    ! mphysics coord level
-    real(8), dimension(:), intent(in) :: geom_norms    ! Geometric norms for calculation
-    real(8), intent(inout) :: norm_pos1 ! Normalized positions for tally
-    real(8), intent(inout) :: norm_pos2 ! Normalized positions for tally
-    integer, intent(in) :: score_type   ! Constant for the tally score type
+    type(Particle), intent(in) :: p      ! particle scorind to tally
+    real(8), intent(inout) :: norm_r     ! Normalized radial coordinate
+    real(8), intent(inout) :: norm_theta ! Normalized theta coordinate
+    real(8), intent(inout) :: norm_z     ! Normalized z coordinate
+    integer, intent(in) :: score_type    ! Constant for the tally score type
+
+    integer :: i                         ! Looping variable
+    integer :: j                         ! Looping variable
+    integer :: cell_id                   ! ID of the particle's cell
+    real(8) :: center(2)                 ! global coordinates of cyl center
+    real(8) :: radius                    ! radius of cylinder
+    real(8) :: heights(2)                ! (min, max) of cylinder height
+    real(8) :: norm_x                    ! normalized x position
+    real(8) :: norm_y                    ! normalized y position
+
+    ! Cell ID of particle
+    cell_id = p % coord(1) % cell
+
+    ! Given the particle's cell, determine the surfaces that bound the cell, and
+    ! under the assumption that this cell is defined by a SurfaceZCylinder and 
+    ! two SurfaceZPlane, we can back out the center, radius, and height of 
+    ! the cylinder for normalization.
+    j = 1
+    do i = 1, size(cells(cell_id) % region)
+      select type(s => surfaces(abs(cells(cell_id) % region(i))) % obj)
+        type is (SurfaceZCylinder)
+          ! read geometric info about cylinder
+          center(1) = s % x0
+          center(2) = s % y0
+          radius = s % r
+        type is (SurfaceZPlane)
+          ! read geometric info about z-plane
+          heights(j) = s % z0
+          j = j + 1
+        class default
+          call fatal_error("get_polynomial_norm_positions assumes that the &
+            & kappa-fission-zn tally is over a cell defined by a cylinder &
+            & oriented in the Z-direction!")
+      end select
+    end do
+
+    ! compute normalized coordinates.
+    norm_x = p % coord(1) % xyz(1) - center(1)
+    norm_y = p % coord(1) % xyz(2) - center(2)
 
     select case (score_type)
     case (SCORE_KAPPA_FISSION_ZN)
-      norm_pos1 = sqrt(coord % xyz(1) * coord % xyz(1) + &
-           coord % xyz(2) * coord % xyz(2)) / geom_norms(1)
-      norm_pos2 = atan(coord % xyz(2) / coord % xyz(1))
-      if (norm_pos2 < ZERO .and. coord % xyz(1) < ZERO) then
-        ! Need to shift to second quadrant
-        norm_pos2 = norm_pos2 - PI
-      else if (norm_pos2 > ZERO .and. coord % xyz(1) < ZERO) then
-        ! Need to shift to third quadrant
-        norm_pos2 = norm_pos2 + PI
-      end if
+      norm_r = sqrt(norm_x * norm_x + norm_y * norm_y) / radius
+      norm_theta = atan2(norm_y, norm_x)
     end select
-
   end subroutine get_polynomial_norm_positions
 
 end module tally

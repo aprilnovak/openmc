@@ -81,9 +81,6 @@ module tally_header
     ! Number of realizations of tally random variables
     integer :: n_realizations = 0
 
-    ! Geometric normalization for FET tallies
-    real(8), allocatable :: fet_geom_norm(:)
-
     ! Tally precision triggers
     integer                           :: n_triggers = 0  ! # of triggers
     type(TriggerObject),  allocatable :: triggers(:)     ! Array of triggers

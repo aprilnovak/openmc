@@ -3754,13 +3754,6 @@ contains
             t % score_bins(j : j + n_bins - 1) = SCORE_KAPPA_FISSION_ZN
             t % moment_order(j : j + n_bins - 1) = n_order
             j = j + n_bins - 1
-            n_fet_norms = node_word_count(node_tal, "geom_norms")
-            if (n_fet_norms /= 1) then
-              call fatal_error('Expecting one value for geometric norm of &
-                   &Zernike kappa-fission tally.')
-            end if
-            allocate(t % fet_geom_norm(n_fet_norms))
-            call get_node_array(node_tal, "geom_norms", t % fet_geom_norm)
 
           case ('nu-scatter-yn')
             t % estimator = ESTIMATOR_ANALOG

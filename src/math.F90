@@ -181,6 +181,24 @@ contains
   end function calc_pn
 
 !===============================================================================
+! CALC_PN_SCALED calculates the n-th order Legendre polynomial at the value of 
+! x, where the Legendre polynomial is scaled by a factor such that when 
+! integrating over the orthogonal domain [-1, 1], the orthogonality condition
+! simply gives the delta function. 
+!===============================================================================
+
+  elemental function calc_pn_scaled(n,x) result(pnx)
+
+    integer, intent(in) :: n   ! Legendre order requested
+    real(8), intent(in) :: x   ! Independent variable the Legendre is to be
+                               ! evaluated at; x must be in the domain [-1,1]
+    real(8)             :: pnx ! The Legendre poly of order n evaluated at x
+
+    pnx = calc_pn(n, x) * sqrt((TWO * n + ONE) / TWO)
+
+  end function calc_pn_scaled
+
+!===============================================================================
 ! CALC_RN calculates the n-th order spherical harmonics for a given angle
 ! (in terms of (u,v,w)).  All Rn,m values are provided (where -n<=m<=n)
 !===============================================================================
@@ -585,7 +603,7 @@ contains
     real(8), intent(in) :: rho         ! Radial location in the unit disk
     real(8), intent(in) :: phi         ! Theta (radians) location in the unit disk
     real(8)             :: zn(n + 1)   ! The resultant Z_n(uvw)
-    ! Right now this is only in 2D.
+    
     ! n == radial degree
     ! m == azimuthal frequency
 
@@ -1709,6 +1727,23 @@ contains
     end select
 
   end function calc_zn
+
+!===============================================================================
+! CALC_ZN_SCALED calculates the n-th order Zernike polynomial moment for a given 
+! angle (rho, theta) location in the unit disk, scaled correctly for orthogonal
+! integration.
+!===============================================================================
+
+  pure function calc_zn_scaled(n, rho, phi) result(zn)
+
+    integer, intent(in) :: n           ! Order requested
+    real(8), intent(in) :: rho         ! Radial location in the unit disk
+    real(8), intent(in) :: phi         ! Theta (radians) location in the unit disk
+    real(8)             :: zn(n + 1)   ! The resultant Z_n(uvw)
+
+    zn = calc_zn(n, rho, phi) / SQRT_PI
+
+  end function calc_zn_scaled
 
 !===============================================================================
 ! EXPAND_HARMONIC expands a given series of real spherical harmonics
