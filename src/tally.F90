@@ -4492,6 +4492,9 @@ contains
     ! the cylinder for normalization.
     j = 1
     do i = 1, size(cells(cell_id) % region)
+      ! don't use operator values to look up surface
+      if (cells(cell_id) % region(i) >= OP_UNION) cycle
+
       select type(s => surfaces(abs(cells(cell_id) % region(i))) % obj)
         type is (SurfaceZCylinder)
           ! read geometric info about cylinder
