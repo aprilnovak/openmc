@@ -333,7 +333,8 @@ module constants
        SCORE_KAPPA_FISSION_ZN   = -25    ! Zernike poly expansion for kappa fission
 
   ! Maximum scattering order supported
-  integer, parameter :: MAX_ANG_ORDER = 18
+  integer, parameter :: MAX_ANG_ORDER = 10
+  integer, parameter :: MAX_Z_ANG_ORDER = 18
 
   ! Names of *-PN & *-YN scores (MOMENT_STRS) and *-N moment scores
   character(*), parameter :: &

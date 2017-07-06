@@ -3544,7 +3544,9 @@ contains
               n_order_pos = scan(score_name,'0123456789')
               n_order = int(str_to_int( &
                    score_name(n_order_pos:(len_trim(score_name)))),4)
-              if (n_order > MAX_ANG_ORDER) then
+              ! separately check that Legendre and Spherical Harmonics don't exceed
+              ! MAX_ANG_ORDER and that Zernike doesn't exceed MAX_Z_ANG_ORDER
+              if (imomstr < ZN_LOC .and. n_order > MAX_ANG_ORDER) then
                 ! User requested too many orders; throw a warning and set to the
                 ! maximum order.
                 ! The above scheme will essentially take the absolute value
@@ -3555,13 +3557,24 @@ contains
                 n_order = MAX_ANG_ORDER
                 sarray(j) = trim(MOMENT_STRS(imomstr)) &
                      // trim(to_str(MAX_ANG_ORDER))
+              else if (imomstr >= ZN_LOC .and. n_order > MAX_Z_ANG_ORDER) then
+                ! User requested too many orders; throw a warning and set to the
+                ! maximum order.
+                ! The above scheme will essentially take the absolute value
+                if (master) call warning("Invalid scattering order of " &
+                     // trim(to_str(n_order)) // " requested. Setting to the &
+                     &maximum permissible value, " &
+                     // trim(to_str(MAX_Z_ANG_ORDER)))
+                n_order = MAX_Z_ANG_ORDER
+                sarray(j) = trim(MOMENT_STRS(imomstr)) &
+                     // trim(to_str(MAX_Z_ANG_ORDER))
               end if
-              ! Find total number of bins for this case
               ! Find total number of bins for this case
               if (imomstr >= YN_LOC .and. imomstr < ZN_LOC) then
                 n_bins = (n_order + 1)**2
               else if (imomstr >= ZN_LOC) then
                 n_bins = n_order * ( n_order + 1 ) / 2 + n_order + 1
+                n_bins_zn = n_bins
               else
                 n_bins = n_order + 1
               end if
@@ -3591,11 +3604,18 @@ contains
               n_order_pos = scan(score_name,'0123456789')
               n_order = int(str_to_int( &
                    score_name(n_order_pos:(len_trim(score_name)))),4)
-              if (n_order > MAX_ANG_ORDER) then
+              ! separately check that Legendre and Spherical Harmonics don't exceed
+              ! MAX_ANG_ORDER and that Zernike doesn't exceed MAX_Z_ANG_ORDER
+              if (imomstr < ZN_LOC .and. n_order > MAX_ANG_ORDER) then
                 ! User requested too many orders; throw a warning and set to the
                 ! maximum order.
                 ! The above scheme will essentially take the absolute value
                 n_order = MAX_ANG_ORDER
+              else if (imomstr >= ZN_LOC .and. n_order > MAX_Z_ANG_ORDER) then
+                ! User requested too many orders; throw a warning and set to the
+                ! maximum order.
+                ! The above scheme will essentially take the absolute value
+                n_order = MAX_Z_ANG_ORDER
               end if
               score_name = trim(MOMENT_STRS(imomstr)) // "n"
               ! Find total number of bins for this case
@@ -3616,15 +3636,24 @@ contains
                 n_order_pos = scan(score_name,'0123456789')
                 n_order = int(str_to_int( &
                      score_name(n_order_pos:(len_trim(score_name)))),4)
-                if (n_order > MAX_ANG_ORDER) then
+                if (imomstr < ZN_LOC .and. n_order > MAX_ANG_ORDER) then
                   ! User requested too many orders; throw a warning and set to the
                   ! maximum order.
                   ! The above scheme will essentially take the absolute value
                   if (master) call warning("Invalid scattering order of " &
-                       // trim(to_str(n_order)) // " requested. Setting to &
-                       &the maximum permissible value, " &
+                       // trim(to_str(n_order)) // " requested. Setting to the &
+                       &maximum permissible value, " &
                        // trim(to_str(MAX_ANG_ORDER)))
                   n_order = MAX_ANG_ORDER
+                else if (imomstr >= ZN_LOC .and. n_order > MAX_Z_ANG_ORDER) then
+                  ! User requested too many orders; throw a warning and set to the
+                  ! maximum order.
+                  ! The above scheme will essentially take the absolute value
+                  if (master) call warning("Invalid scattering order of " &
+                       // trim(to_str(n_order)) // " requested. Setting to the &
+                       &maximum permissible value, " &
+                       // trim(to_str(MAX_Z_ANG_ORDER)))
+                  n_order = MAX_Z_ANG_ORDER
                 end if
                 score_name = trim(MOMENT_N_STRS(imomstr)) // "n"
                 exit
