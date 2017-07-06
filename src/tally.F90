@@ -15,7 +15,7 @@ module tally
                               mesh_intersects_3d
   use mesh_header,      only: RegularMesh
   use message_passing
-  use output,           only: header
+  use output,           only: header, mean_stdev
   use particle_header,  only: LocalCoord, Particle
   use string,           only: to_str
   use surface_header
@@ -4523,4 +4523,138 @@ contains
     end select
   end subroutine get_polynomial_norm_positions
 
+!==============================================================================
+! FET_DECONSTRUCTION computes the mean and standard deviation of the
+! expansion coefficients for kappa-fission-zn tallies and stores the mean
+! according to the index of the cell in the cell filter in the t % coeffs array.
+! In the case that non-cell filters are also specified, this routine sums over
+! all filters except the cell filters for storage in the coeffs array.
+!==============================================================================
+
+  subroutine fet_deconstruction() BIND(C)
+
+    type(TallyObject), pointer :: t ! pointer to tallies(i)
+
+    integer :: i            ! index in tallies array
+    integer :: j            ! level in tally hierarchy
+    integer :: k            ! loop index for scoring bins
+    integer :: n            ! loop index for nuclides
+    integer :: l            ! loop index for user scores
+    integer :: h            ! loop index for tally filters
+    integer :: s            ! counter for zernike polynomials
+    integer :: z            ! counter for zernike polynomials
+    integer :: filter_index ! index in results array for filters
+    integer :: score_index  ! scoring bin index
+    integer :: cell_index   ! index in filt % cells array
+    integer :: cell_filt_i  ! index for cell filter in tally's filters
+    integer :: coeff_index  ! index of expansion coefficient
+    integer :: i_nuclide    ! index in nuclides array
+    integer :: n_order      ! loop index for moment orders
+    integer :: nm_order     ! loop index for Ynm moment orders
+    integer :: nr           ! number of realizations
+    real(8) :: x(2)         ! mean and standard deviation
+
+    TALLY_LOOP: do i = 1, n_tallies
+      t => tallies(i)
+
+      ! skip any tallies that don't have coefficients associated with them
+      if (.not. allocated(t % coeffs)) cycle TALLY_LOOP
+
+      nr = t % n_realizations
+
+      ! The value of t % find_filter(FILTER_CELL) gives the index in the
+      ! list of filters specified for the tally in XML that is the cell filter.
+      cell_filt_i = t % find_filter(FILTER_CELL)
+
+      ! initialize bins and filter level
+      do h = 1, size(t % filter)
+        call filter_matches(t % filter(h)) % bins % clear()
+        call filter_matches(t % filter(h)) % bins % push_back(0)
+      end do
+      j = 1
+
+      print_bin: do
+        find_bin: do
+          ! Check for no filters
+          if (size(t % filter) == 0) exit find_bin
+
+          ! Increment bin combination for this filter
+          filter_matches(t % filter(j)) % bins % data(1) = &
+               filter_matches(t % filter(j)) % bins % data(1) + 1
+
+          ! =================================================================
+          ! REACHED END OF BINS FOR THIS FILTER, MOVE TO NEXT FILTER
+
+          if (filter_matches(t % filter(j)) % bins % data(1) > &
+               filters(t % filter(j)) % obj % n_bins) then
+            ! If this is the first filter, then exit
+            if (j == 1) exit print_bin
+
+            filter_matches(t % filter(j)) % bins % data(1) = 0
+            j = j - 1
+
+            ! =================================================================
+            ! VALID BIN -- WRITE FILTER INFORMATION OR EXIT TO WRITE RESULTS
+
+          else
+            ! Check if this is last filter
+            if (j == size(t % filter)) exit find_bin
+
+            j = j + 1
+          end if
+
+        end do find_bin
+
+        ! Determine scoring index for this bin combination -- note that unlike
+        ! in the score_tally subroutine, we have to use max(bins,1) since all
+        ! bins below the lowest filter level will be zeros
+        filter_index = 1
+        do h = 1, size(t % filter)
+          filter_index = filter_index + (max(filter_matches(t % filter(h)) &
+               % bins % data(1),1) - 1) * t % stride(h)
+        end do
+
+        ! cell_index represents the index in the cell list for the cell filter
+        cell_index = filter_matches(t % filter(cell_filt_i)) % bins % data(1)
+
+        ! Write results for this filter bin combination
+        score_index = 0
+        do n = 1, t % n_nuclide_bins
+          k = 0
+          do l = 1, t % n_user_score_bins
+            k = k + 1
+            score_index = score_index + 1
+
+            associate(r => t % results(RESULT_SUM:RESULT_SUM_SQ, :, :))
+
+            if (t % score_bins(k) == SCORE_KAPPA_FISSION_ZN) then
+              z = 0
+              score_index = score_index - 1
+              s = score_index
+              ! loop over the n order
+              do n_order = 0, t % moment_order(k)
+                z = z + n_order + 1
+                ! loop over the m order (there are n + 1 m's for each n)
+                do nm_order = 1, n_order + 1
+                  score_index = score_index + 1
+                  coeff_index = score_index - s
+                  x(:) = mean_stdev(r(:, score_index, filter_index), nr)
+                  t % coeffs(cell_index, coeff_index) = &
+                    t % coeffs(cell_index, coeff_index) + x(1)
+                end do
+              end do
+              k = k + z
+            end if
+            end associate
+          end do
+
+        end do
+
+        if (size(t % filter) == 0) exit print_bin
+
+      end do print_bin
+
+    end do TALLY_LOOP
+
+  end subroutine fet_deconstruction
 end module tally
