@@ -136,6 +136,9 @@ contains
       if (allocated(tallies(i) % results)) then
         tallies(i) % results(:, :, :) = ZERO
       end if
+      if (allocated(tallies(i) % coeffs)) then
+        tallies(i) % coeffs(:, :) = ZERO
+      end if
     end do
 
     ! Reset global tallies
