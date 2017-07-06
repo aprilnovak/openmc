@@ -4670,8 +4670,8 @@ contains
 !===============================================================================
 
   subroutine get_coeffs_from_cell(cell_id, cell_coeffs, n) bind(c)
-    integer, intent(in) :: cell_id           ! cell ID from input file
-    integer, intent(in) :: n                 ! number of coeffs
+    integer, intent(in) :: cell_id                             ! cell ID
+    integer, intent(in) :: n                                   ! number of coeffs
     real(C_DOUBLE), intent(inout), dimension(n) :: cell_coeffs ! FET coefficients
 
     type(TallyObject), pointer :: t    ! pointer to tally
@@ -4688,7 +4688,7 @@ contains
       cell_index = cell_dict % get_key(cell_id)
     else
       call fatal_error("Invalid cell ID specified for retrieving expansion&
-        coefficients for kappa-fission-zn tally!")
+       & coefficients for kappa-fission-zn tally!")
     end if
 
     TALLY_LOOP: do i = 1, n_tallies
@@ -4699,7 +4699,7 @@ contains
       else
         ! Find the cell filter for this tally (read_tallies_xml restricts
         ! the number of cell filters to 1).
-        do j = 1, size(t % filter)
+        FILTER_LOOP: do j = 1, size(t % filter)
 
           select type (filt => filters(t % filter(j)) % obj)
           type is (CellFilter)
@@ -4720,7 +4720,7 @@ contains
 
           end select
 
-        end do
+        end do FILTER_LOOP
 
       ! only match with the first FET tally
       exit TALLY_LOOP
@@ -4735,5 +4735,99 @@ contains
       & tallies are defined!")
 
   end subroutine get_coeffs_from_cell
+
+!===============================================================================
+! RECEIVE_COEFFS_FOR_CELL populates the received_coeffs array with expansion
+! coefficients from an external code given a cell ID. This assumes that a FET
+! tally has already been defined for the cell in OpenMC, since the
+! received_coeffs array is stored according to a TallyObject, and the tally loop
+! will only match with tallies that have coeffs allocated (only kappa-fission-zn
+! tallies). A match is only made with the first matching tally, so multiple
+! FETs defined over the same cell should not exist in OpenMC until some
+! mechanism for communicating with the external code about which tallies are to
+! be used for coupling, and which for tallying for other purposes, exists.
+!===============================================================================
+
+  subroutine receive_coeffs_for_cell(cell_id, cell_coeffs, n) BIND(C)
+    integer, intent(in) :: cell_id                          ! cell ID
+    integer, intent(in) :: n                                ! number of coeffs
+    real(C_DOUBLE), intent(in), dimension(n) :: cell_coeffs ! FET coefficients
+
+    type(TallyObject), pointer :: t    ! pointer to tally
+    integer :: cell_index              ! index in cells(:) array
+    integer :: i                       ! tallies index
+    integer :: j                       ! filter index
+    integer :: k                       ! cels index for filter
+    logical :: FOUND                   ! was a tally with that cell found
+
+    FOUND = .false.
+
+    ! determine cell index from cell ID
+    if (cell_dict % has_key(cell_id)) then
+      cell_index = cell_dict % get_key(cell_id)
+    else
+      call fatal_error("Invalid cell ID specified for storing expansion&
+        & coefficients for kappa-fission-zn tally!")
+    end if
+
+    TALLY_LOOP: do i = 1, n_tallies
+      t => tallies(i)
+
+      if (.not. allocated(t % coeffs)) then
+        cycle
+      else
+
+        ! Find the cell filter for this tally (read_tallies_xml restricts
+        ! the number of cell filters to 1).
+        FILTER_LOOP: do j = 1, size(t % filter)
+
+          select type (filt => filters(t % filter(j)) % obj)
+          type is (CellFilter)
+            ! Find which cell in the cell filter matches the one requested
+            do k = 1, size(filt % cells)
+              ! filt % cells contains indices to the cells(:) array
+              if (cell_index == filt % cells(k)) then
+
+                ! We allocate the received_coeffs array based on the size of the
+                ! cell_coeffs passed into this subroutine if it has not already
+                ! been allocated. The number of cells is assumed to be the same
+                ! as those tracked on the OpenMC side.
+                if (.not. allocated(t % received_coeffs)) then
+                  allocate(t % received_coeffs(size(t % coeffs(:, 1)), n))
+                else
+                  ! If coefficients have previously been received for this cell,
+                  ! then assume that the number of coefficients to be received
+                  ! is always the same. A check is made to ensure that the new
+                  ! received coefficients is of the appropriate length.
+                  if (n /= size(t % received_coeffs(1, :))) call fatal_error("Number&
+                    & of expansion coefficients passed for cell&
+                    & " // trim(cells(cell_id) % name) // " does not equal its&
+                    & allocated size!")
+                end if
+
+                t % received_coeffs(k, :) = cell_coeffs
+                FOUND = .true.
+                exit
+              end if
+            end do
+
+          end select
+
+        end do FILTER_LOOP
+
+      ! only match with the first FET tally
+      exit TALLY_LOOP
+      end if
+
+    end do TALLY_LOOP
+
+    ! Error if no tallies with a cell filter with the requested cell were found
+    if (.not. FOUND) call fatal_error("Cannot set expansion coefficients for&
+      & cell '"// trim(cells(cell_index) % name) // "' because no kappa-fission-zn&
+      & tallies are defined!")
+
+  end subroutine receive_coeffs_for_cell
+
+
 
 end module tally
