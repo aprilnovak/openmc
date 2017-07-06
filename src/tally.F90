@@ -4657,4 +4657,83 @@ contains
     end do TALLY_LOOP
 
   end subroutine fet_deconstruction
+
+!===============================================================================
+! GET_COEFFS_FROM_CELL returns the expansion coefficients given a cell index in
+! the cells array. This only looks over tallies that have the coeffs array
+! allocated, and assumes that multiple tallies do not define FETs for the same
+! spatial cell, since only the first matching tally is used. It is advised to
+! not define multiple FET tallies over the same cell because no check is made
+! on the size of the cell_coeffs array that is passed in and the number of
+! coefficients that are to be stored in it (which may not match if the two
+! tallies are of different expansion order).
+!===============================================================================
+
+  subroutine get_coeffs_from_cell(cell_id, cell_coeffs, n) bind(c)
+    integer, intent(in) :: cell_id           ! cell ID from input file
+    integer, intent(in) :: n                 ! number of coeffs
+    real(C_DOUBLE), intent(inout), dimension(n) :: cell_coeffs ! FET coefficients
+
+    type(TallyObject), pointer :: t    ! pointer to tally
+    integer :: cell_index              ! index in cells(:) array
+    integer :: i                       ! tallies index
+    integer :: j                       ! filter index
+    integer :: k                       ! cels index for filter
+    logical :: FOUND                   ! was a tally with that cell found
+
+    FOUND = .false.
+
+    ! determine cell index from cell ID
+    if (cell_dict % has_key(cell_id)) then
+      cell_index = cell_dict % get_key(cell_id)
+    else
+      call fatal_error("Invalid cell ID specified for retrieving expansion&
+        coefficients for kappa-fission-zn tally!")
+    end if
+
+    TALLY_LOOP: do i = 1, n_tallies
+      t => tallies(i)
+
+      if (.not. allocated(t % coeffs)) then
+        cycle
+      else
+        ! Find the cell filter for this tally (read_tallies_xml restricts
+        ! the number of cell filters to 1).
+        do j = 1, size(t % filter)
+
+          select type (filt => filters(t % filter(j)) % obj)
+          type is (CellFilter)
+            ! Find which cell in the cell filter matches the one requested
+            do k = 1, size(filt % cells)
+              ! filt % cells contains indices to the cells(:) array
+              if (cell_index == filt % cells(k)) then
+                ! check to make sure the array is of the correct size
+                if (n /= size(t % coeffs(k, :))) call fatal_error("Length of array&
+                  & to receive coefficients does not match number of coefficients!&
+                  & Check that the array to hold coefficients has been allocated&
+                  & with the proper size.")
+                cell_coeffs = t % coeffs(k, :)
+                FOUND = .true.
+                exit
+              end if
+            end do
+
+          end select
+
+        end do
+
+      ! only match with the first FET tally
+      exit TALLY_LOOP
+      end if
+
+    end do TALLY_LOOP
+
+
+    ! Error if no tallies with a cell filter with the requested cell were found
+    if (.not. FOUND) call fatal_error("Cannot get expansion coefficients from&
+      & cell '"// trim(cells(cell_index) % name) // "' because no kappa-fission-zn&
+      & tallies are defined!")
+
+  end subroutine get_coeffs_from_cell
+
 end module tally
