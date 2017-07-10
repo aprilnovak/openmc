@@ -4531,10 +4531,7 @@ contains
 ! all filters except the cell filters for storage in the coeffs array.
 !==============================================================================
 
-  subroutine fet_deconstruction() BIND(C)
-
-    type(TallyObject), pointer :: t ! pointer to tallies(i)
-
+  subroutine fet_deconstruction() bind(C)
     integer :: i            ! index in tallies array
     integer :: j            ! level in tally hierarchy
     integer :: k            ! loop index for scoring bins
@@ -4555,7 +4552,7 @@ contains
     real(8) :: x(2)         ! mean and standard deviation
 
     TALLY_LOOP: do i = 1, n_tallies
-      t => tallies(i)
+      associate(t => tallies(i))
 
       ! skip any tallies that don't have coefficients associated with them
       if (.not. allocated(t % coeffs)) cycle TALLY_LOOP
@@ -4654,6 +4651,7 @@ contains
 
       end do print_bin
 
+      end associate
     end do TALLY_LOOP
 
   end subroutine fet_deconstruction
@@ -4674,7 +4672,6 @@ contains
     integer, intent(in) :: n                                   ! number of coeffs
     real(C_DOUBLE), intent(inout), dimension(n) :: cell_coeffs ! FET coefficients
 
-    type(TallyObject), pointer :: t    ! pointer to tally
     integer :: cell_index              ! index in cells(:) array
     integer :: i                       ! tallies index
     integer :: j                       ! filter index
@@ -4692,7 +4689,7 @@ contains
     end if
 
     TALLY_LOOP: do i = 1, n_tallies
-      t => tallies(i)
+      associate(t => tallies(i))
 
       if (.not. allocated(t % coeffs)) then
         cycle
@@ -4726,6 +4723,7 @@ contains
       exit TALLY_LOOP
       end if
 
+      end associate
     end do TALLY_LOOP
 
 
@@ -4753,7 +4751,6 @@ contains
     integer, intent(in) :: n                                ! number of coeffs
     real(C_DOUBLE), intent(in), dimension(n) :: cell_coeffs ! FET coefficients
 
-    type(TallyObject), pointer :: t    ! pointer to tally
     integer :: cell_index              ! index in cells(:) array
     integer :: i                       ! tallies index
     integer :: j                       ! filter index
@@ -4771,7 +4768,7 @@ contains
     end if
 
     TALLY_LOOP: do i = 1, n_tallies
-      t => tallies(i)
+      associate(t => tallies(i))
 
       if (.not. allocated(t % coeffs)) then
         cycle
@@ -4819,6 +4816,7 @@ contains
       exit TALLY_LOOP
       end if
 
+      end associate
     end do TALLY_LOOP
 
     ! Error if no tallies with a cell filter with the requested cell were found
