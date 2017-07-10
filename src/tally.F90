@@ -4771,40 +4771,37 @@ contains
       if (allocated(t % coeffs)) then
         ! Find the cell filter for this tally (read_tallies_xml restricts
         ! the number of cell filters to 1).
-        FILTER_LOOP: do j = 1, size(t % filter)
+        select type (filt => filters(t % find_filter(FILTER_CELL)) % obj)
+        type is (CellFilter)
+          ! Find which cell in the cell filter matches the one requested
+          do k = 1, size(filt % cells)
+            ! filt % cells contains indices to the cells(:) array
+            if (cell_index == filt % cells(k)) then
 
-          select type (filt => filters(t % filter(j)) % obj)
-          type is (CellFilter)
-            ! Find which cell in the cell filter matches the one requested
-            do k = 1, size(filt % cells)
-              ! filt % cells contains indices to the cells(:) array
-              if (cell_index == filt % cells(k)) then
-
-                ! We allocate the received_coeffs array based on the size of the
-                ! cell_coeffs passed into this subroutine if it has not already
-                ! been allocated. The number of cells is assumed to be the same
-                ! as those tracked on the OpenMC side.
-                if (.not. allocated(t % received_coeffs)) then
-                  allocate(t % received_coeffs(size(t % coeffs(:, 1)), n))
-                else
-                  ! If coefficients have previously been received for this cell,
-                  ! then assume that the number of coefficients to be received
-                  ! is always the same. A check is made to ensure that the new
-                  ! received coefficients is of the appropriate length.
-                  if (n /= size(t % received_coeffs(1, :))) call fatal_error("Number&
-                    & of expansion coefficients passed for cell&
-                    & " // trim(cells(cell_id) % name) // " does not equal its&
-                    & allocated size!")
-                end if
-
-                t % received_coeffs(k, :) = cell_coeffs
-                FOUND = .true.
-                exit
+              ! We allocate the received_coeffs array based on the size of the
+              ! cell_coeffs passed into this subroutine if it has not already
+              ! been allocated. The number of cells is assumed to be the same
+              ! as those tracked on the OpenMC side.
+              if (.not. allocated(t % received_coeffs)) then
+                allocate(t % received_coeffs(size(t % coeffs(:, 1)), n))
+              else
+                ! If coefficients have previously been received for this cell,
+                ! then assume that the number of coefficients to be received
+                ! is always the same. A check is made to ensure that the new
+                ! received coefficients is of the appropriate length.
+                if (n /= size(t % received_coeffs(1, :))) call fatal_error("Number&
+                  & of expansion coefficients passed for cell&
+                  & " // trim(cells(cell_id) % name) // " does not equal its&
+                  & allocated size!")
               end if
-            end do
 
-          end select
-        end do FILTER_LOOP
+              t % received_coeffs(k, :) = cell_coeffs
+              FOUND = .true.
+              exit
+            end if
+          end do
+
+        end select
 
         ! only match with the first FET tally
         exit TALLY_LOOP
