@@ -4691,9 +4691,7 @@ contains
     TALLY_LOOP: do i = 1, n_tallies
       associate(t => tallies(i))
 
-      if (.not. allocated(t % coeffs)) then
-        cycle
-      else
+      if (allocated(t % coeffs)) then
         ! Find the cell filter for this tally (read_tallies_xml restricts
         ! the number of cell filters to 1).
         FILTER_LOOP: do j = 1, size(t % filter)
@@ -4719,8 +4717,8 @@ contains
 
         end do FILTER_LOOP
 
-      ! only match with the first FET tally
-      exit TALLY_LOOP
+        ! only match with the first FET tally
+        exit TALLY_LOOP
       end if
 
       end associate
@@ -4770,10 +4768,7 @@ contains
     TALLY_LOOP: do i = 1, n_tallies
       associate(t => tallies(i))
 
-      if (.not. allocated(t % coeffs)) then
-        cycle
-      else
-
+      if (allocated(t % coeffs)) then
         ! Find the cell filter for this tally (read_tallies_xml restricts
         ! the number of cell filters to 1).
         FILTER_LOOP: do j = 1, size(t % filter)
@@ -4809,11 +4804,10 @@ contains
             end do
 
           end select
-
         end do FILTER_LOOP
 
-      ! only match with the first FET tally
-      exit TALLY_LOOP
+        ! only match with the first FET tally
+        exit TALLY_LOOP
       end if
 
       end associate
