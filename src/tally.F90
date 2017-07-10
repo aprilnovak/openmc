@@ -4667,24 +4667,24 @@ contains
 ! tallies are of different expansion order).
 !===============================================================================
 
-  subroutine get_coeffs_from_cell(cell_id, cell_coeffs, n) bind(C)
+  function get_coeffs_from_cell(cell_id, cell_coeffs, n) result(err) bind(C)
     integer(C_INT), intent(in), value :: cell_id               ! cell ID
     integer(C_INT), intent(in), value :: n                     ! number of coeffs
     real(C_DOUBLE), intent(inout), dimension(n) :: cell_coeffs ! FET coefficients
 
+    integer(C_INT) :: err              ! error code
     integer :: cell_index              ! index in cells(:) array
     integer :: i                       ! tallies index
     integer :: j                       ! filter index
     integer :: k                       ! cels index for filter
-    logical :: FOUND                   ! was a tally with that cell found
 
-    FOUND = .false.
+    err = -3
+
     ! determine cell index from cell ID
     if (cell_dict % has_key(cell_id)) then
       cell_index = cell_dict % get_key(cell_id)
     else
-      call fatal_error("Invalid cell ID specified for retrieving expansion&
-       & coefficients for kappa-fission-zn tally!")
+      err = -1
     end if
 
     TALLY_LOOP: do i = 1, n_tallies
@@ -4702,12 +4702,9 @@ contains
               ! filt % cells contains indices to the cells(:) array
               if (cell_index == filt % cells(k)) then
                 ! check to make sure the array is of the correct size
-                if (n /= size(t % coeffs(k, :))) call fatal_error("Length of array&
-                  & to receive coefficients does not match number of coefficients!&
-                  & Check that the array to hold coefficients has been allocated&
-                  & with the proper size.")
+                if (n /= size(t % coeffs(k, :))) err = -2
                 cell_coeffs = t % coeffs(k, :)
-                FOUND = .true.
+                err = 0
                 exit
               end if
             end do
@@ -4723,13 +4720,7 @@ contains
       end associate
     end do TALLY_LOOP
 
-
-    ! Error if no tallies with a cell filter with the requested cell were found
-    if (.not. FOUND) call fatal_error("Cannot get expansion coefficients from&
-      & cell '"// trim(cells(cell_index) % name) // "' because no kappa-fission-zn&
-      & tallies are defined!")
-
-  end subroutine get_coeffs_from_cell
+  end function get_coeffs_from_cell
 
 !===============================================================================
 ! RECEIVE_COEFFS_FOR_CELL populates the received_coeffs array with expansion
@@ -4743,25 +4734,24 @@ contains
 ! be used for coupling, and which for tallying for other purposes, exists.
 !===============================================================================
 
-  subroutine receive_coeffs_for_cell(cell_id, cell_coeffs, n) bind(C)
+  function receive_coeffs_for_cell(cell_id, cell_coeffs, n) result(err) bind(C)
     integer(C_INT), intent(in), value :: cell_id                  ! cell ID
     integer(C_INT), intent(in), value :: n                         ! number of coeffs
     real(C_DOUBLE), intent(in), dimension(n) :: cell_coeffs ! FET coefficients
 
+    integer(C_INT) :: err              ! error code
     integer :: cell_index              ! index in cells(:) array
     integer :: i                       ! tallies index
     integer :: j                       ! filter index
     integer :: k                       ! cels index for filter
-    logical :: FOUND                   ! was a tally with that cell found
 
-    FOUND = .false.
+    err = -3
 
     ! determine cell index from cell ID
     if (cell_dict % has_key(cell_id)) then
       cell_index = cell_dict % get_key(cell_id)
     else
-      call fatal_error("Invalid cell ID specified for storing expansion&
-        & coefficients for kappa-fission-zn tally!")
+      err = -1
     end if
 
     TALLY_LOOP: do i = 1, n_tallies
@@ -4788,13 +4778,10 @@ contains
                 ! then assume that the number of coefficients to be received
                 ! is always the same. A check is made to ensure that the new
                 ! received coefficients is of the appropriate length.
-                if (n /= size(t % received_coeffs(1, :))) call fatal_error("Number&
-                  & of expansion coefficients passed for cell&
-                  & " // trim(cells(cell_id) % name) // " does not equal its&
-                  & allocated size!")
+                if (n /= size(t % received_coeffs(1, :))) err = -2
               end if
               t % received_coeffs(k, :) = cell_coeffs
-              FOUND = .true.
+              err = 0
               exit
             end if
           end do
@@ -4808,12 +4795,7 @@ contains
       end associate
     end do TALLY_LOOP
 
-    ! Error if no tallies with a cell filter with the requested cell were found
-    if (.not. FOUND) call fatal_error("Cannot set expansion coefficients for&
-      & cell '"// trim(cells(cell_index) % name) // "' because no kappa-fission-zn&
-      & tallies are defined!")
-
-  end subroutine receive_coeffs_for_cell
+  end function receive_coeffs_for_cell
 
 
 
