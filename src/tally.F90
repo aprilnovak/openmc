@@ -4675,7 +4675,6 @@ contains
     integer(C_INT) :: err              ! error code
     integer :: cell_index              ! index in cells(:) array
     integer :: i                       ! tallies index
-    integer :: j                       ! filter index
     integer :: k                       ! cels index for filter
 
     err = -3
@@ -4693,25 +4692,21 @@ contains
       if (allocated(t % coeffs)) then
         ! Find the cell filter for this tally (read_tallies_xml restricts
         ! the number of cell filters to 1).
-        FILTER_LOOP: do j = 1, size(t % filter)
+        select type (filt => filters(t % find_filter(FILTER_CELL)) % obj)
+        type is (CellFilter)
+          ! Find which cell in the cell filter matches the one requested
+          do k = 1, size(filt % cells)
+            ! filt % cells contains indices to the cells(:) array
+            if (cell_index == filt % cells(k)) then
+              ! check to make sure the array is of the correct size
+              if (n /= size(t % coeffs(k, :))) err = -2
+              cell_coeffs = t % coeffs(k, :)
+              err = 0
+              exit
+            end if
+          end do
 
-          select type (filt => filters(t % filter(j)) % obj)
-          type is (CellFilter)
-            ! Find which cell in the cell filter matches the one requested
-            do k = 1, size(filt % cells)
-              ! filt % cells contains indices to the cells(:) array
-              if (cell_index == filt % cells(k)) then
-                ! check to make sure the array is of the correct size
-                if (n /= size(t % coeffs(k, :))) err = -2
-                cell_coeffs = t % coeffs(k, :)
-                err = 0
-                exit
-              end if
-            end do
-
-          end select
-
-        end do FILTER_LOOP
+        end select
 
         ! only match with the first FET tally
         exit TALLY_LOOP
@@ -4742,7 +4737,6 @@ contains
     integer(C_INT) :: err              ! error code
     integer :: cell_index              ! index in cells(:) array
     integer :: i                       ! tallies index
-    integer :: j                       ! filter index
     integer :: k                       ! cels index for filter
 
     err = -3
@@ -4796,7 +4790,5 @@ contains
     end do TALLY_LOOP
 
   end function receive_coeffs_for_cell
-
-
 
 end module tally
