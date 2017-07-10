@@ -3637,7 +3637,7 @@ contains
                 n_order_pos = scan(score_name,'0123456789')
                 n_order = int(str_to_int( &
                      score_name(n_order_pos:(len_trim(score_name)))),4)
-                if (imomstr < ZN_LOC .and. n_order > MAX_ANG_ORDER) then
+                if (n_order > MAX_ANG_ORDER) then
                   ! User requested too many orders; throw a warning and set to the
                   ! maximum order.
                   ! The above scheme will essentially take the absolute value
@@ -3646,15 +3646,6 @@ contains
                        &maximum permissible value, " &
                        // trim(to_str(MAX_ANG_ORDER)))
                   n_order = MAX_ANG_ORDER
-                else if (imomstr >= ZN_LOC .and. n_order > MAX_Z_ANG_ORDER) then
-                  ! User requested too many orders; throw a warning and set to the
-                  ! maximum order.
-                  ! The above scheme will essentially take the absolute value
-                  if (master) call warning("Invalid scattering order of " &
-                       // trim(to_str(n_order)) // " requested. Setting to the &
-                       &maximum permissible value, " &
-                       // trim(to_str(MAX_Z_ANG_ORDER)))
-                  n_order = MAX_Z_ANG_ORDER
                 end if
                 score_name = trim(MOMENT_N_STRS(imomstr)) // "n"
                 exit
@@ -3800,11 +3791,11 @@ contains
               ! t % filter(cell_filt_i) gives the index in the filters array of
               ! the cell filter.
               allocate(t % coeffs(filters(t % filter(cell_filt_i)) &
-                % obj % n_bins, n_bins_zn))
+                   % obj % n_bins, n_bins_zn))
               t % coeffs = ZERO
             else
               call fatal_error("kappa-fission-zn tally must be used with a &
-                & cell filter!")
+                   & cell filter!")
             end if
 
           case ('nu-scatter-yn')
