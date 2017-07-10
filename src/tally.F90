@@ -4667,9 +4667,9 @@ contains
 ! tallies are of different expansion order).
 !===============================================================================
 
-  subroutine get_coeffs_from_cell(cell_id, cell_coeffs, n) bind(c)
-    integer, intent(in) :: cell_id                             ! cell ID
-    integer, intent(in) :: n                                   ! number of coeffs
+  subroutine get_coeffs_from_cell(cell_id, cell_coeffs, n) bind(C)
+    integer(C_INT), intent(in), value :: cell_id               ! cell ID
+    integer(C_INT), intent(in), value :: n                     ! number of coeffs
     real(C_DOUBLE), intent(inout), dimension(n) :: cell_coeffs ! FET coefficients
 
     integer :: cell_index              ! index in cells(:) array
@@ -4679,7 +4679,6 @@ contains
     logical :: FOUND                   ! was a tally with that cell found
 
     FOUND = .false.
-
     ! determine cell index from cell ID
     if (cell_dict % has_key(cell_id)) then
       cell_index = cell_dict % get_key(cell_id)
@@ -4744,9 +4743,9 @@ contains
 ! be used for coupling, and which for tallying for other purposes, exists.
 !===============================================================================
 
-  subroutine receive_coeffs_for_cell(cell_id, cell_coeffs, n) BIND(C)
-    integer, intent(in) :: cell_id                          ! cell ID
-    integer, intent(in) :: n                                ! number of coeffs
+  subroutine receive_coeffs_for_cell(cell_id, cell_coeffs, n) bind(C)
+    integer(C_INT), intent(in), value :: cell_id                  ! cell ID
+    integer(C_INT), intent(in), value :: n                         ! number of coeffs
     real(C_DOUBLE), intent(in), dimension(n) :: cell_coeffs ! FET coefficients
 
     integer :: cell_index              ! index in cells(:) array
@@ -4794,7 +4793,6 @@ contains
                   & " // trim(cells(cell_id) % name) // " does not equal its&
                   & allocated size!")
               end if
-
               t % received_coeffs(k, :) = cell_coeffs
               FOUND = .true.
               exit
