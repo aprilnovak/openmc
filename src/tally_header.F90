@@ -75,6 +75,28 @@ module tally_header
     integer :: total_score_bins
     real(C_DOUBLE), allocatable :: results(:,:,:)
 
+    ! Results for the expansion coefficients. The first index refers to the
+    ! index in the filters(i) % obj % cells(:) array for the cell filter
+    ! used with an FET tally. The second index holds all of the expansion
+    ! coefficients. It is assumed that all of the cells that an FET
+    ! tally applies to will use the same expansion order, so the second
+    ! dimension of coeffs will always be the same length. It is also assumed
+    ! that the only FET present is the kappa-fission-zn tally, since this is
+    ! only allocated for that type of score.
+    real(C_DOUBLE), allocatable :: coeffs(:, :)
+
+    ! Coefficients received from external physics code. Storing receivied
+    ! coefficients in this manner (associated with a tally defined in OpenMC)
+    ! assumes that for each FET defined in OpenMC, communication occurs with
+    ! an external physics code over that same cell. If more FETs are defined
+    ! in OpenMC than strictly necessary to communicate with external codes,
+    ! then received_coeffs for those tallies simply is not allocated. However,
+    ! if less FETs are defined in OpenMC than are required for transfer, then
+    ! there will be no place to store received expansion coefficients from an
+    ! external code. So, at least as many FETs as necessary for coupling must
+    ! be defined in the tallies XML file.
+    real(C_DOUBLE), allocatable :: received_coeffs(:, :)
+
     ! reset property - allows a tally to be reset after every batch
     logical :: reset = .false.
 

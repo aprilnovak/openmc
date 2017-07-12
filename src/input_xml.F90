@@ -2645,9 +2645,11 @@ contains
     integer :: n             ! size of arrays in mesh specification
     integer :: n_words       ! number of words read
     integer :: n_filter      ! number of filters
+    integer :: cell_filt_i   ! index in <filters> listed for tally that's cell filt
     integer :: n_new         ! number of new scores to add based on Yn/Pn tally
     integer :: n_scores      ! number of tot scores after adjusting for Yn/Pn tally
     integer :: n_bins        ! total new bins for this score
+    integer :: n_bins_zn     ! variable to store num bins for zernike FET
     integer :: n_user_trig   ! number of user-specified tally triggers
     integer :: trig_ind      ! index of triggers array for each tally
     integer :: user_trig_ind ! index of user-specified triggers for each tally
@@ -2659,7 +2661,6 @@ contains
     integer :: imomstr       ! Index of MOMENT_STRS & MOMENT_N_STRS
     logical :: file_exists   ! does tallies.xml file exist?
     real(8) :: rarray3(3)    ! temporary double prec. array
-    integer :: n_fet_norms   ! number of geometric norms for FET
     integer :: Nangle        ! Number of angular bins
     real(8) :: dangle        ! Mu spacing if using automatic allocation
     integer :: iangle        ! Loop counter for building mu filter bins
@@ -3544,7 +3545,9 @@ contains
               n_order_pos = scan(score_name,'0123456789')
               n_order = int(str_to_int( &
                    score_name(n_order_pos:(len_trim(score_name)))),4)
-              if (n_order > MAX_ANG_ORDER) then
+              ! separately check that Legendre and Spherical Harmonics don't exceed
+              ! MAX_ANG_ORDER and that Zernike doesn't exceed MAX_Z_ANG_ORDER
+              if (imomstr < ZN_LOC .and. n_order > MAX_ANG_ORDER) then
                 ! User requested too many orders; throw a warning and set to the
                 ! maximum order.
                 ! The above scheme will essentially take the absolute value
@@ -3555,13 +3558,24 @@ contains
                 n_order = MAX_ANG_ORDER
                 sarray(j) = trim(MOMENT_STRS(imomstr)) &
                      // trim(to_str(MAX_ANG_ORDER))
+              else if (imomstr >= ZN_LOC .and. n_order > MAX_Z_ANG_ORDER) then
+                ! User requested too many orders; throw a warning and set to the
+                ! maximum order.
+                ! The above scheme will essentially take the absolute value
+                if (master) call warning("Invalid scattering order of " &
+                     // trim(to_str(n_order)) // " requested. Setting to the &
+                     &maximum permissible value, " &
+                     // trim(to_str(MAX_Z_ANG_ORDER)))
+                n_order = MAX_Z_ANG_ORDER
+                sarray(j) = trim(MOMENT_STRS(imomstr)) &
+                     // trim(to_str(MAX_Z_ANG_ORDER))
               end if
-              ! Find total number of bins for this case
               ! Find total number of bins for this case
               if (imomstr >= YN_LOC .and. imomstr < ZN_LOC) then
                 n_bins = (n_order + 1)**2
               else if (imomstr >= ZN_LOC) then
                 n_bins = n_order * ( n_order + 1 ) / 2 + n_order + 1
+                n_bins_zn = n_bins
               else
                 n_bins = n_order + 1
               end if
@@ -3591,11 +3605,18 @@ contains
               n_order_pos = scan(score_name,'0123456789')
               n_order = int(str_to_int( &
                    score_name(n_order_pos:(len_trim(score_name)))),4)
-              if (n_order > MAX_ANG_ORDER) then
+              ! separately check that Legendre and Spherical Harmonics don't exceed
+              ! MAX_ANG_ORDER and that Zernike doesn't exceed MAX_Z_ANG_ORDER
+              if (imomstr < ZN_LOC .and. n_order > MAX_ANG_ORDER) then
                 ! User requested too many orders; throw a warning and set to the
                 ! maximum order.
                 ! The above scheme will essentially take the absolute value
                 n_order = MAX_ANG_ORDER
+              else if (imomstr >= ZN_LOC .and. n_order > MAX_Z_ANG_ORDER) then
+                ! User requested too many orders; throw a warning and set to the
+                ! maximum order.
+                ! The above scheme will essentially take the absolute value
+                n_order = MAX_Z_ANG_ORDER
               end if
               score_name = trim(MOMENT_STRS(imomstr)) // "n"
               ! Find total number of bins for this case
@@ -3621,8 +3642,8 @@ contains
                   ! maximum order.
                   ! The above scheme will essentially take the absolute value
                   if (master) call warning("Invalid scattering order of " &
-                       // trim(to_str(n_order)) // " requested. Setting to &
-                       &the maximum permissible value, " &
+                       // trim(to_str(n_order)) // " requested. Setting to the &
+                       &maximum permissible value, " &
                        // trim(to_str(MAX_ANG_ORDER)))
                   n_order = MAX_ANG_ORDER
                 end if
@@ -3754,6 +3775,28 @@ contains
             t % score_bins(j : j + n_bins - 1) = SCORE_KAPPA_FISSION_ZN
             t % moment_order(j : j + n_bins - 1) = n_order
             j = j + n_bins - 1
+            ! This tally must be used with a cell filter.
+            if (t % find_filter(FILTER_CELL) > 0) then
+              ! Allocate coeffs(number of cells in filter, number of
+              ! coefficients per cell). It is assumed that the size of this
+              ! array will not need to change between Picard steps, since this
+              ! size is not adjusted during openmc_reset (though it is reset
+              ! to ZERO). t % find_filter(FILTER_CELL) returns the position in
+              ! the <filters> section of the tallies XML file that is the cell
+              ! filter. This needs to be converted to the index in the filters
+              ! array that corresponds to the specified filter.
+              cell_filt_i = t % find_filter(FILTER_CELL)
+              ! cell_filt_i needs to be converted to the correct index in the
+              ! filters array to find the correct number of bins.
+              ! t % filter(cell_filt_i) gives the index in the filters array of
+              ! the cell filter.
+              allocate(t % coeffs(filters(t % filter(cell_filt_i)) &
+                   % obj % n_bins, n_bins_zn))
+              t % coeffs = ZERO
+            else
+              call fatal_error("kappa-fission-zn tally must be used with a &
+                   & cell filter!")
+            end if
 
           case ('nu-scatter-yn')
             t % estimator = ESTIMATOR_ANALOG

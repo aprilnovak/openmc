@@ -15,7 +15,7 @@ module tally
                               mesh_intersects_3d
   use mesh_header,      only: RegularMesh
   use message_passing
-  use output,           only: header
+  use output,           only: header, mean_stdev
   use particle_header,  only: LocalCoord, Particle
   use string,           only: to_str
   use surface_header
@@ -4492,6 +4492,9 @@ contains
     ! the cylinder for normalization.
     j = 1
     do i = 1, size(cells(cell_id) % region)
+      ! don't use operator values to look up surface
+      if (cells(cell_id) % region(i) >= OP_UNION) cycle
+
       select type(s => surfaces(abs(cells(cell_id) % region(i))) % obj)
         type is (SurfaceZCylinder)
           ! read geometric info about cylinder
@@ -4519,5 +4522,273 @@ contains
       norm_theta = atan2(norm_y, norm_x)
     end select
   end subroutine get_polynomial_norm_positions
+
+!==============================================================================
+! FET_DECONSTRUCTION computes the mean and standard deviation of the
+! expansion coefficients for kappa-fission-zn tallies and stores the mean
+! according to the index of the cell in the cell filter in the t % coeffs array.
+! In the case that non-cell filters are also specified, this routine sums over
+! all filters except the cell filters for storage in the coeffs array.
+!==============================================================================
+
+  subroutine fet_deconstruction() bind(C)
+    integer :: i            ! index in tallies array
+    integer :: j            ! level in tally hierarchy
+    integer :: k            ! loop index for scoring bins
+    integer :: n            ! loop index for nuclides
+    integer :: l            ! loop index for user scores
+    integer :: h            ! loop index for tally filters
+    integer :: s            ! counter for zernike polynomials
+    integer :: z            ! counter for zernike polynomials
+    integer :: filter_index ! index in results array for filters
+    integer :: score_index  ! scoring bin index
+    integer :: cell_index   ! index in filt % cells array
+    integer :: cell_filt_i  ! index for cell filter in tally's filters
+    integer :: coeff_index  ! index of expansion coefficient
+    integer :: i_nuclide    ! index in nuclides array
+    integer :: n_order      ! loop index for moment orders
+    integer :: nm_order     ! loop index for Ynm moment orders
+    integer :: nr           ! number of realizations
+    real(8) :: x(2)         ! mean and standard deviation
+
+    TALLY_LOOP: do i = 1, n_tallies
+      associate(t => tallies(i))
+
+      ! skip any tallies that don't have coefficients associated with them
+      if (.not. allocated(t % coeffs)) cycle TALLY_LOOP
+
+      nr = t % n_realizations
+
+      ! The value of t % find_filter(FILTER_CELL) gives the index in the
+      ! list of filters specified for the tally in XML that is the cell filter.
+      cell_filt_i = t % find_filter(FILTER_CELL)
+
+      ! initialize bins and filter level
+      do h = 1, size(t % filter)
+        call filter_matches(t % filter(h)) % bins % clear()
+        call filter_matches(t % filter(h)) % bins % push_back(0)
+      end do
+      j = 1
+
+      print_bin: do
+        find_bin: do
+          ! Check for no filters
+          if (size(t % filter) == 0) exit find_bin
+
+          ! Increment bin combination for this filter
+          filter_matches(t % filter(j)) % bins % data(1) = &
+               filter_matches(t % filter(j)) % bins % data(1) + 1
+
+          ! =================================================================
+          ! REACHED END OF BINS FOR THIS FILTER, MOVE TO NEXT FILTER
+
+          if (filter_matches(t % filter(j)) % bins % data(1) > &
+               filters(t % filter(j)) % obj % n_bins) then
+            ! If this is the first filter, then exit
+            if (j == 1) exit print_bin
+
+            filter_matches(t % filter(j)) % bins % data(1) = 0
+            j = j - 1
+
+            ! =================================================================
+            ! VALID BIN -- WRITE FILTER INFORMATION OR EXIT TO WRITE RESULTS
+
+          else
+            ! Check if this is last filter
+            if (j == size(t % filter)) exit find_bin
+
+            j = j + 1
+          end if
+
+        end do find_bin
+
+        ! Determine scoring index for this bin combination -- note that unlike
+        ! in the score_tally subroutine, we have to use max(bins,1) since all
+        ! bins below the lowest filter level will be zeros
+        filter_index = 1
+        do h = 1, size(t % filter)
+          filter_index = filter_index + (max(filter_matches(t % filter(h)) &
+               % bins % data(1),1) - 1) * t % stride(h)
+        end do
+
+        ! cell_index represents the index in the cell list for the cell filter
+        cell_index = filter_matches(t % filter(cell_filt_i)) % bins % data(1)
+
+        ! Write results for this filter bin combination
+        score_index = 0
+        do n = 1, t % n_nuclide_bins
+          k = 0
+          do l = 1, t % n_user_score_bins
+            k = k + 1
+            score_index = score_index + 1
+
+            associate(r => t % results(RESULT_SUM:RESULT_SUM_SQ, :, :))
+
+            if (t % score_bins(k) == SCORE_KAPPA_FISSION_ZN) then
+              z = 0
+              score_index = score_index - 1
+              s = score_index
+              ! loop over the n order
+              do n_order = 0, t % moment_order(k)
+                z = z + n_order + 1
+                ! loop over the m order (there are n + 1 m's for each n)
+                do nm_order = 1, n_order + 1
+                  score_index = score_index + 1
+                  coeff_index = score_index - s
+                  x(:) = mean_stdev(r(:, score_index, filter_index), nr)
+                  t % coeffs(cell_index, coeff_index) = &
+                    t % coeffs(cell_index, coeff_index) + x(1)
+                end do
+              end do
+              k = k + z
+            end if
+            end associate
+          end do
+
+        end do
+
+        if (size(t % filter) == 0) exit print_bin
+
+      end do print_bin
+
+      end associate
+    end do TALLY_LOOP
+
+  end subroutine fet_deconstruction
+
+!===============================================================================
+! GET_COEFFS_FROM_CELL returns the expansion coefficients given a cell index in
+! the cells array. This only looks over tallies that have the coeffs array
+! allocated, and assumes that multiple tallies do not define FETs for the same
+! spatial cell, since only the first matching tally is used. It is advised to
+! not define multiple FET tallies over the same cell because no check is made
+! on the size of the cell_coeffs array that is passed in and the number of
+! coefficients that are to be stored in it (which may not match if the two
+! tallies are of different expansion order).
+!===============================================================================
+
+  function get_coeffs_from_cell(cell_id, cell_coeffs, n) result(err) bind(C)
+    integer(C_INT), intent(in), value :: cell_id               ! cell ID
+    integer(C_INT), intent(in), value :: n                     ! number of coeffs
+    real(C_DOUBLE), intent(inout), dimension(n) :: cell_coeffs ! FET coefficients
+
+    integer(C_INT) :: err              ! error code
+    integer :: cell_index              ! index in cells(:) array
+    integer :: i                       ! tallies index
+    integer :: k                       ! cels index for filter
+
+    err = -3
+
+    ! determine cell index from cell ID
+    if (cell_dict % has_key(cell_id)) then
+      cell_index = cell_dict % get_key(cell_id)
+    else
+      err = -1
+    end if
+
+    TALLY_LOOP: do i = 1, n_tallies
+      associate(t => tallies(i))
+
+      if (allocated(t % coeffs)) then
+        ! Find the cell filter for this tally (read_tallies_xml restricts
+        ! the number of cell filters to 1).
+        select type (filt => filters(t % find_filter(FILTER_CELL)) % obj)
+        type is (CellFilter)
+          ! Find which cell in the cell filter matches the one requested
+          do k = 1, size(filt % cells)
+            ! filt % cells contains indices to the cells(:) array
+            if (cell_index == filt % cells(k)) then
+              ! check to make sure the array is of the correct size
+              if (n /= size(t % coeffs(k, :))) err = -2
+              cell_coeffs = t % coeffs(k, :)
+              err = 0
+              exit
+            end if
+          end do
+
+        end select
+
+        ! only match with the first FET tally
+        exit TALLY_LOOP
+      end if
+
+      end associate
+    end do TALLY_LOOP
+
+  end function get_coeffs_from_cell
+
+!===============================================================================
+! RECEIVE_COEFFS_FOR_CELL populates the received_coeffs array with expansion
+! coefficients from an external code given a cell ID. This assumes that a FET
+! tally has already been defined for the cell in OpenMC, since the
+! received_coeffs array is stored according to a TallyObject, and the tally loop
+! will only match with tallies that have coeffs allocated (only kappa-fission-zn
+! tallies). A match is only made with the first matching tally, so multiple
+! FETs defined over the same cell should not exist in OpenMC until some
+! mechanism for communicating with the external code about which tallies are to
+! be used for coupling, and which for tallying for other purposes, exists.
+!===============================================================================
+
+  function receive_coeffs_for_cell(cell_id, cell_coeffs, n) result(err) bind(C)
+    integer(C_INT), intent(in), value :: cell_id                  ! cell ID
+    integer(C_INT), intent(in), value :: n                         ! number of coeffs
+    real(C_DOUBLE), intent(in), dimension(n) :: cell_coeffs ! FET coefficients
+
+    integer(C_INT) :: err              ! error code
+    integer :: cell_index              ! index in cells(:) array
+    integer :: i                       ! tallies index
+    integer :: k                       ! cels index for filter
+
+    err = -3
+
+    ! determine cell index from cell ID
+    if (cell_dict % has_key(cell_id)) then
+      cell_index = cell_dict % get_key(cell_id)
+    else
+      err = -1
+    end if
+
+    TALLY_LOOP: do i = 1, n_tallies
+      associate(t => tallies(i))
+
+      if (allocated(t % coeffs)) then
+        ! Find the cell filter for this tally (read_tallies_xml restricts
+        ! the number of cell filters to 1).
+        select type (filt => filters(t % find_filter(FILTER_CELL)) % obj)
+        type is (CellFilter)
+          ! Find which cell in the cell filter matches the one requested
+          do k = 1, size(filt % cells)
+            ! filt % cells contains indices to the cells(:) array
+            if (cell_index == filt % cells(k)) then
+
+              ! We allocate the received_coeffs array based on the size of the
+              ! cell_coeffs passed into this subroutine if it has not already
+              ! been allocated. The number of cells is assumed to be the same
+              ! as those tracked on the OpenMC side.
+              if (.not. allocated(t % received_coeffs)) then
+                allocate(t % received_coeffs(size(t % coeffs(:, 1)), n))
+              else
+                ! If coefficients have previously been received for this cell,
+                ! then assume that the number of coefficients to be received
+                ! is always the same. A check is made to ensure that the new
+                ! received coefficients is of the appropriate length.
+                if (n /= size(t % received_coeffs(1, :))) err = -2
+              end if
+              t % received_coeffs(k, :) = cell_coeffs
+              err = 0
+              exit
+            end if
+          end do
+
+        end select
+
+        ! only match with the first FET tally
+        exit TALLY_LOOP
+      end if
+
+      end associate
+    end do TALLY_LOOP
+
+  end function receive_coeffs_for_cell
 
 end module tally
