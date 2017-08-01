@@ -4667,41 +4667,44 @@ contains
 ! tallies are of different expansion order).
 !===============================================================================
 
-  function get_coeffs_from_cell(cell_id, cell_coeffs, n) result(err) bind(C)
-    integer(C_INT), intent(in), value :: cell_id               ! cell ID
+  function get_coeffs_from_cell(cell_index, cell_coeffs, n) result(err) bind(C)
+    integer(C_INT32_T), intent(in), value :: cell_index        ! cell ID
     integer(C_INT), intent(in), value :: n                     ! number of coeffs
     real(C_DOUBLE), intent(inout), dimension(n) :: cell_coeffs ! FET coefficients
 
     integer(C_INT) :: err              ! error code
-    integer :: cell_index              ! index in cells(:) array
     integer :: i                       ! tallies index
     integer :: k                       ! cels index for filter
 
-    err = -3
-
-    ! determine cell index from cell ID
-    if (cell_dict % has_key(cell_id)) then
-      cell_index = cell_dict % get_key(cell_id)
-    else
-      err = -1
-    end if
+    ! this routine requires an FET to be already defined for the cell, so
+    ! if one is not found, then the error code represents that an FET is
+    ! not defined for the current cell.
+    err = -11
 
     TALLY_LOOP: do i = 1, n_tallies
       associate(t => tallies(i))
 
       if (allocated(t % coeffs)) then
         ! Find the cell filter for this tally (read_tallies_xml restricts
-        ! the number of cell filters to 1).
+        ! the number of cell filters to 1). This cell filter is guaranteed
+        ! to be present based on restrictions in the read_tallies_xml routine.
         select type (filt => filters(t % find_filter(FILTER_CELL)) % obj)
         type is (CellFilter)
           ! Find which cell in the cell filter matches the one requested
           do k = 1, size(filt % cells)
+            ! now that we know an FET is defined for this cell, the error
+            ! code becomes cell not found until we find the matching cell
+            err = -5
+
             ! filt % cells contains indices to the cells(:) array
             if (cell_index == filt % cells(k)) then
               ! check to make sure the array is of the correct size
-              if (n /= size(t % coeffs(k, :))) err = -2
-              cell_coeffs = t % coeffs(k, :)
-              err = 0
+              if (n /= size(t % coeffs(k, :))) then
+                err = -13
+              else
+                cell_coeffs = t % coeffs(k, :)
+                err = 0
+              end if
               exit
             end if
           end do
@@ -4719,67 +4722,68 @@ contains
 
 !===============================================================================
 ! RECEIVE_COEFFS_FOR_CELL populates the received_coeffs array with expansion
-! coefficients from an external code given a cell ID. This assumes that a FET
-! tally has already been defined for the cell in OpenMC, since the
-! received_coeffs array is stored according to a TallyObject, and the tally loop
-! will only match with tallies that have coeffs allocated (only kappa-fission-zn
-! tallies). A match is only made with the first matching tally, so multiple
-! FETs defined over the same cell should not exist in OpenMC until some
-! mechanism for communicating with the external code about which tallies are to
-! be used for coupling, and which for tallying for other purposes, exists.
+! coefficients from an external code given a cell index in the cells array.
+! This assumes that a FET tally has already been defined for the cell in OpenMC,
+! since the received_coeffs array is stored according to a TallyObject, and the
+! tally loop will only match with tallies that have coeffs allocated (only
+! kappa-fission-zn tallies). A match is only made with the first matching tally,
+! so multiple FETs defined over the same cell should not exist in OpenMC until
+! some mechanism for communicating with the external code about which tallies
+! are to be used for coupling, and which for tallying for other purposes, exists.
 !===============================================================================
 
-  function receive_coeffs_for_cell(cell_id, cell_coeffs, n) result(err) bind(C)
-    integer(C_INT), intent(in), value :: cell_id                  ! cell ID
-    integer(C_INT), intent(in), value :: n                         ! number of coeffs
+  function receive_coeffs_for_cell(cell_index, cell_coeffs, n) result(err) bind(C)
+    integer(C_INT32_T), intent(in), value    :: cell_index  ! cell index
+    integer(C_INT), intent(in), value        :: n           ! number of coeffs
     real(C_DOUBLE), intent(in), dimension(n) :: cell_coeffs ! FET coefficients
 
     integer(C_INT) :: err              ! error code
-    integer :: cell_index              ! index in cells(:) array
     integer :: i                       ! tallies index
     integer :: k                       ! cels index for filter
 
-    err = -3
-
-    ! determine cell index from cell ID
-    if (cell_dict % has_key(cell_id)) then
-      cell_index = cell_dict % get_key(cell_id)
-    else
-      err = -1
-    end if
+    ! this routine requires an FET to be already defined for the cell, so
+    ! if one is not found, then the error code represents that an FET is
+    ! not defined for the current cell.
+    err = -11
 
     TALLY_LOOP: do i = 1, n_tallies
       associate(t => tallies(i))
 
       if (allocated(t % coeffs)) then
         ! Find the cell filter for this tally (read_tallies_xml restricts
-        ! the number of cell filters to 1).
+        ! the number of cell filters to 1). This cell filter is guaranteed
+        ! to be present based on restrictions in the read_tallies_xml routine.
         select type (filt => filters(t % find_filter(FILTER_CELL)) % obj)
         type is (CellFilter)
           ! Find which cell in the cell filter matches the one requested
           do k = 1, size(filt % cells)
+            ! now that we know an FET is defined for this cell, the error
+            ! code becomes cell not found until we find the matching cell
+            err = -5
+
             ! filt % cells contains indices to the cells(:) array
             if (cell_index == filt % cells(k)) then
-
               ! We allocate the received_coeffs array based on the size of the
               ! cell_coeffs passed into this subroutine if it has not already
               ! been allocated. The number of cells is assumed to be the same
               ! as those tracked on the OpenMC side.
               if (.not. allocated(t % received_coeffs)) then
                 allocate(t % received_coeffs(size(t % coeffs(:, 1)), n))
-              else
-                ! If coefficients have previously been received for this cell,
-                ! then assume that the number of coefficients to be received
-                ! is always the same. A check is made to ensure that the new
-                ! received coefficients is of the appropriate length.
-                if (n /= size(t % received_coeffs(1, :))) err = -2
               end if
-              t % received_coeffs(k, :) = cell_coeffs
-              err = 0
+              ! If coefficients have previously been received for this cell,
+              ! then assume that the number of coefficients to be received
+              ! is always the same. A check is made to ensure that the new
+              ! received coefficients is of the appropriate length.
+              if (n /= size(t % received_coeffs(1, :))) then
+                err = -13
+              else
+                t % received_coeffs(k, :) = cell_coeffs
+                err = 0
+              end if
+
               exit
             end if
           end do
-
         end select
 
         ! only match with the first FET tally
