@@ -67,10 +67,12 @@ endif()
 # this, we check for the environment variable HDF5_ROOT and if it exists, use it
 # to check whether its a parallel version.
 
-if(DEFINED ENV{HDF5_ROOT} AND EXISTS $ENV{HDF5_ROOT}/bin/h5pcc)
-  set(HDF5_PREFER_PARALLEL TRUE)
-else()
-  set(HDF5_PREFER_PARALLEL FALSE)
+if(NOT DEFINED HDF5_PREFER_PARALLEL)
+  if(DEFINED ENV{HDF5_ROOT} AND EXISTS $ENV{HDF5_ROOT}/bin/h5pcc)
+    set(HDF5_PREFER_PARALLEL TRUE)
+  else()
+    set(HDF5_PREFER_PARALLEL FALSE)
+  endif()
 endif()
 
 find_package(HDF5 COMPONENTS Fortran_HL)
@@ -317,9 +319,7 @@ set(LIBOPENMC_FORTRAN_SRC
   src/endf.F90
   src/endf_header.F90
   src/energy_distribution.F90
-  src/energy_grid.F90
   src/error.F90
-  src/finalize.F90
   src/geometry.F90
   src/geometry_header.F90
   src/global.F90
@@ -412,7 +412,7 @@ target_link_libraries(${program} ${ldflags} libopenmc)
 add_custom_command(TARGET libopenmc POST_BUILD
   COMMAND ${CMAKE_COMMAND} -E copy
   $<TARGET_FILE:libopenmc>
-  ${CMAKE_CURRENT_SOURCE_DIR}/openmc/_$<TARGET_FILE_NAME:libopenmc>
+  ${CMAKE_CURRENT_SOURCE_DIR}/openmc/capi/_$<TARGET_FILE_NAME:libopenmc>
   COMMENT "Copying libopenmc to Python module directory")
 
 #===============================================================================
