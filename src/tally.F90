@@ -4502,6 +4502,8 @@ contains
     case (SCORE_KAPPA_FISSION_ZN)
       norm_r = sqrt(norm_x * norm_x + norm_y * norm_y) / radius
       norm_theta = atan2(norm_y, norm_x)
+      norm_z = 2 * (p % coord(1) % xyz(3) - heights(1)) / &
+        & (heights(2) - heights(1)) - 1.0
     end select
   end subroutine get_polynomial_norm_positions
 
@@ -4776,5 +4778,13 @@ contains
     end do TALLY_LOOP
 
   end function receive_coeffs_for_cell
+
+!===============================================================================
+  function get_keff() result(k) bind(C)
+    real(C_DOUBLE) :: k
+
+    k = keff
+
+  end function get_keff
 
 end module tally
