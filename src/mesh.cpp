@@ -2400,9 +2400,13 @@ void LibMesh::initialize()
     pl_.back()->enable_out_of_mesh_mode();
   }
 
-  // store first element in the mesh to use as an offset for bin indices
-  auto first_elem = *m_->elements_begin();
-  first_element_id_ = first_elem->id();
+  // store mapping of element IDs to bin indices
+  int i = 0;
+  for (const auto & elem : as_range(m_->active_elements_begin(), m_->active_elements_end()))
+  {
+    bin_to_id_map_.push_back(elem->id());
+    id_to_bin_map_[elem->id()] = i++;
+  }
 
   // bounding box for the mesh for quick rejection checks
   bbox_ = libMesh::MeshTools::create_bounding_box(*m_);
@@ -2422,7 +2426,7 @@ std::string LibMesh::library() const
 
 int LibMesh::n_bins() const
 {
-  return m_->n_elem();
+  return m_->n_active_elem();
 }
 
 int LibMesh::n_surface_bins() const
@@ -2489,7 +2493,7 @@ void LibMesh::set_score_data(const std::string& var_name,
   std::string std_dev_name = var_name + "_std_dev";
   unsigned int std_dev_num = variable_map_.at(std_dev_name);
 
-  for (auto it = m_->local_elements_begin(); it != m_->local_elements_end();
+  for (auto it = m_->active_elements_begin(); it != m_->active_elements_end();
        it++) {
     auto bin = get_bin_from_element(*it);
 
@@ -2548,11 +2552,11 @@ int LibMesh::get_bin(Position r) const
 
 int LibMesh::get_bin_from_element(const libMesh::Elem* elem) const
 {
-  int bin = elem->id() - first_element_id_;
-  if (bin >= n_bins() || bin < 0) {
-    fatal_error(fmt::format("Invalid bin: {}", bin));
-  }
-  return bin;
+  if (!id_to_bin_map_.count(elem->id()))
+    fatal_error(fmt::format("Invalid element ID: {}. "
+      "Did the element numbering in your mesh change?", elem->id()));
+
+  return id_to_bin_map_.at(elem->id());
 }
 
 std::pair<vector<double>, vector<double>> LibMesh::plot(
@@ -2563,12 +2567,12 @@ std::pair<vector<double>, vector<double>> LibMesh::plot(
 
 const libMesh::Elem& LibMesh::get_element_from_bin(int bin) const
 {
-  return m_->elem_ref(bin);
+  return m_->elem_ref(bin_to_id_map_[bin]);
 }
 
 double LibMesh::volume(int bin) const
 {
-  return m_->elem_ref(bin).volume();
+  return get_element_from_bin(bin).volume();
 }
 
 #endif // LIBMESH

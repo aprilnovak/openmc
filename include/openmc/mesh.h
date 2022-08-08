@@ -732,8 +732,8 @@ private:
     variable_map_; //!< mapping of variable names (tally scores) to libMesh
                    //!< variable numbers
   libMesh::BoundingBox bbox_; //!< bounding box of the mesh
-  libMesh::dof_id_type
-    first_element_id_; //!< id of the first element in the mesh
+  std::vector<libMesh::dof_id_type> bin_to_id_map_; //!< map from bin IDs to element IDs
+  std::map<unsigned int, libMesh::dof_id_type> id_to_bin_map_; //!< map from element IDs to bin IDs
 };
 
 #endif
