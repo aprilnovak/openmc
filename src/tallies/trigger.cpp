@@ -77,9 +77,9 @@ void check_tally_triggers(double& ratio, int& tally_id, int& score)
         auto uncert_pair =
           get_tally_uncertainty(i_tally, trigger.score_index, filter_index);
 
-        // if there is a score without contributions, set ratio to inf and
-        // exit early
-        if (uncert_pair.first == -1) {
+        // If there is a score without contributions, set ratio to inf and
+        // exit early, unless zero score is allowed for this trigger.
+        if (uncert_pair.first == -1 && !trigger.allow_zero) {
           ratio = INFINITY;
           score = t.scores_[trigger.score_index];
           tally_id = t.id_;
@@ -167,7 +167,7 @@ void check_triggers()
   // See if the current batch is one for which the triggers must be checked.
   if (!settings::trigger_on)
     return;
-  if (current_batch < n_batches)
+  if (current_batch <= n_batches)
     return;
   if (((current_batch - n_batches) % interval) != 0)
     return;
