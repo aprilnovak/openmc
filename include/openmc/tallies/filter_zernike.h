@@ -48,6 +48,9 @@ public:
   double r() const { return r_; }
   void set_r(double r) { r_ = r; }
 
+  int num_sides() const { return num_sides_; }
+  void set_num_sides(int num_sides) { num_sides_ = num_sides; }
+
   //----------------------------------------------------------------------------
   // Data members
 
@@ -60,6 +63,9 @@ protected:
 
   //! Maximum radius from the origin covered by this expansion.
   double r_;
+
+  //! Number of sides of hte regular polygon coved by this expansion.
+  int num_sides_;
 
   int order_;
 };

@@ -430,11 +430,12 @@ class ZernikeFilter(ExpansionFilter):
 
     """
 
-    def __init__(self, order, x=0.0, y=0.0, r=1.0, filter_id=None):
+    def __init__(self, order, x=0.0, y=0.0, r=1.0, num_sides=0.0, filter_id=None):
         super().__init__(order, filter_id)
         self.x = x
         self.y = y
         self.r = r
+        self.num_sides = int(num_sides)
 
     def __hash__(self):
         string = type(self).__name__ + '\n'
@@ -442,11 +443,13 @@ class ZernikeFilter(ExpansionFilter):
         string += '{: <16}=\t{}\n'.format('\tX', self.x)
         string += '{: <16}=\t{}\n'.format('\tY', self.y)
         string += '{: <16}=\t{}\n'.format('\tR', self.r)
+        string += '{: <16}=\t{}\n'.format('\tNumSides', self.num_sides)
         return hash(string)
 
     def __repr__(self):
         string = type(self).__name__ + '\n'
         string += '{: <16}=\t{}\n'.format('\tOrder', self.order)
+        string += '{: <16}=\t{}\n'.format('\tNumSides', self.num_sides)
         string += '{: <16}=\t{}\n'.format('\tID', self.id)
         return string
 
@@ -484,6 +487,20 @@ class ZernikeFilter(ExpansionFilter):
         cv.check_type('r', r, Real)
         self._r = r
 
+    @property
+    def num_sides(self):
+        return self._num_sides
+
+    @num_sides.setter
+    def num_sides(self, num_sides):
+        cv.check_type('num_sides', num_sides, int)
+        if (num_sides < 3 and num_sides != 0):
+            raise ValueError(
+                f"The number of sides, {num_sides}, is less than three, the " +
+                "fewest number of sides a regular polygon can have."
+            )
+        self._num_sides = num_sides
+
     @classmethod
     def from_hdf5(cls, group, **kwargs):
         if group['type'][()].decode() != cls.short_name.lower():
@@ -494,8 +511,9 @@ class ZernikeFilter(ExpansionFilter):
         filter_id = int(group.name.split('/')[-1].lstrip('filter '))
         order = group['order'][()]
         x, y, r = group['x'][()], group['y'][()], group['r'][()]
+        num_sides = group['num_sides'][()]
 
-        return cls(order, x, y, r, filter_id)
+        return cls(order, x, y, r, num_sides, filter_id)
 
     def to_xml_element(self):
         """Return XML Element representing the filter.
@@ -513,6 +531,8 @@ class ZernikeFilter(ExpansionFilter):
         subelement.text = str(self.y)
         subelement = ET.SubElement(element, 'r')
         subelement.text = str(self.r)
+        subelement = ET.SubElement(element, 'num_sides')
+        subelement.text = str(self.num_sides)
 
         return element
 
@@ -523,7 +543,8 @@ class ZernikeFilter(ExpansionFilter):
         x = float(elem.find('x').text)
         y = float(elem.find('y').text)
         r = float(elem.find('r').text)
-        return cls(order, x, y, r, filter_id=filter_id)
+        num_sides = int(elem.find('num_sides').text)
+        return cls(order, x, y, r, num_sides, filter_id=filter_id)
 
 
 class ZernikeRadialFilter(ZernikeFilter):
