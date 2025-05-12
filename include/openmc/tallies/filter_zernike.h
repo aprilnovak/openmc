@@ -51,6 +51,9 @@ public:
   int num_sides() const { return num_sides_; }
   void set_num_sides(int num_sides) { num_sides_ = num_sides; }
 
+  double angle() const { return angle_; }
+  void set_angle(float angle) { angle_ = angle; }
+
   //----------------------------------------------------------------------------
   // Data members
 
@@ -64,8 +67,11 @@ protected:
   //! Maximum radius from the origin covered by this expansion.
   double r_;
 
-  //! Number of sides of hte regular polygon coved by this expansion.
+  //! Number of sides of the regular polygon coved by this expansion.
   int num_sides_;
+
+  //! Angular offset for the polygonal Zernike tally
+  double angle_;
 
   int order_;
 };

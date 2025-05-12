@@ -412,6 +412,11 @@ class ZernikeFilter(ExpansionFilter):
         y-coordinate of center of circle for normalization
     r : float
         Radius of circle for normalization
+    num_bins : int
+        The number of filter bins
+    angle : float
+        Angular offset of the tally in radians. An angle of 0 corresponds to
+        a sector being split evenly down the +x axis.
 
     Attributes
     ----------
@@ -427,15 +432,18 @@ class ZernikeFilter(ExpansionFilter):
         Unique identifier for the filter
     num_bins : int
         The number of filter bins
-
+    angle : float
+        Angular offset of the tally in radians. An angle of 0 corresponds to
+        a sector being split evenly down the +x axis.
     """
 
-    def __init__(self, order, x=0.0, y=0.0, r=1.0, num_sides=0.0, filter_id=None):
+    def __init__(self, order, x=0.0, y=0.0, r=1.0, num_sides=0.0, angle=0.0, filter_id=None):
         super().__init__(order, filter_id)
         self.x = x
         self.y = y
         self.r = r
         self.num_sides = int(num_sides)
+        self.angle = float(angle)
 
     def __hash__(self):
         string = type(self).__name__ + '\n'
@@ -444,12 +452,14 @@ class ZernikeFilter(ExpansionFilter):
         string += '{: <16}=\t{}\n'.format('\tY', self.y)
         string += '{: <16}=\t{}\n'.format('\tR', self.r)
         string += '{: <16}=\t{}\n'.format('\tNumSides', self.num_sides)
+        string += '{: <16}=\t{}\n'.format('\tAngle', self.angle)
         return hash(string)
 
     def __repr__(self):
         string = type(self).__name__ + '\n'
         string += '{: <16}=\t{}\n'.format('\tOrder', self.order)
         string += '{: <16}=\t{}\n'.format('\tNumSides', self.num_sides)
+        string += '{: <16}=\t{}\n'.format('\tAngle', self.angle)
         string += '{: <16}=\t{}\n'.format('\tID', self.id)
         return string
 
@@ -501,6 +511,15 @@ class ZernikeFilter(ExpansionFilter):
             )
         self._num_sides = num_sides
 
+    @property
+    def angle(self):
+        return self._angle
+
+    @angle.setter
+    def angle(self, angle):
+        cv.check_type('angle', angle, float)
+        self._angle = angle
+
     @classmethod
     def from_hdf5(cls, group, **kwargs):
         if group['type'][()].decode() != cls.short_name.lower():
@@ -512,8 +531,9 @@ class ZernikeFilter(ExpansionFilter):
         order = group['order'][()]
         x, y, r = group['x'][()], group['y'][()], group['r'][()]
         num_sides = group['num_sides'][()]
+        angle = group['angle'][()]
 
-        return cls(order, x, y, r, num_sides, filter_id)
+        return cls(order, x, y, r, num_sides, angle, filter_id)
 
     def to_xml_element(self):
         """Return XML Element representing the filter.
@@ -533,6 +553,8 @@ class ZernikeFilter(ExpansionFilter):
         subelement.text = str(self.r)
         subelement = ET.SubElement(element, 'num_sides')
         subelement.text = str(self.num_sides)
+        subelement = ET.SubElement(element, 'angle')
+        subelement.text = str(self.angle)
 
         return element
 
@@ -544,7 +566,8 @@ class ZernikeFilter(ExpansionFilter):
         y = float(elem.find('y').text)
         r = float(elem.find('r').text)
         num_sides = int(elem.find('num_sides').text)
-        return cls(order, x, y, r, num_sides, filter_id=filter_id)
+        angle = float(elem.find('angle').txt)
+        return cls(order, x, y, r, num_sides, angle, filter_id=filter_id)
 
 
 class ZernikeRadialFilter(ZernikeFilter):

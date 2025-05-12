@@ -25,6 +25,7 @@ void ZernikeFilter::from_xml(pugi::xml_node node)
   y_ = std::stod(get_node_value(node, "y"));
   r_ = std::stod(get_node_value(node, "r"));
   num_sides_ = std::stod(get_node_value(node, "num_sides"));
+  angle_ = std::stod(get_node_value(node, "angle"));
 }
 
 void ZernikeFilter::get_all_bins(
@@ -36,6 +37,7 @@ void ZernikeFilter::get_all_bins(
   double r = std::sqrt(x * x + y * y) / r_;
   double theta = std::atan2(y, x);
   int num_sides = num_sides_;
+  double angle = angle_;
 
   if (num_sides == 0) {
     // Normalizing r for an non-unit disk
@@ -45,7 +47,7 @@ void ZernikeFilter::get_all_bins(
   if (num_sides != 0) {
     // Normalizing r for the regular polygon.
     double alpha = M_PI / num_sides;
-    int sector = double((theta + alpha) / (2 * alpha));
+    int sector = double((theta + alpha + angle) / (2 * alpha));
     double u_alpha = (theta - sector * 2 * alpha);
     double r_alpha = r_ * cos(alpha) / cos(u_alpha);
 
