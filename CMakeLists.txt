@@ -276,7 +276,7 @@ endif()
 # xtensor header-only library
 #===============================================================================
 
-find_package_write_status(xtensor)
+#find_package_write_status(xtensor)
 if (NOT xtensor_FOUND)
   add_subdirectory(vendor/xtl)
   set(xtl_DIR ${CMAKE_CURRENT_BINARY_DIR}/vendor/xtl)
