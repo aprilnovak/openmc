@@ -73,6 +73,7 @@ void ZernikeFilter::to_statepoint(hid_t filter_group) const
   write_dataset(filter_group, "y", y_);
   write_dataset(filter_group, "r", r_);
   write_dataset(filter_group, "num_sides", num_sides_);
+  write_dataset(filter_group, "angle", angle_);
 }
 
 std::string ZernikeFilter::text_label(int bin) const
