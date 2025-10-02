@@ -47,7 +47,8 @@ void ZernikeFilter::get_all_bins(
   if (num_sides != 0) {
     // Normalizing r for the regular polygon.
     double alpha = M_PI / num_sides;
-    int sector = double((theta + alpha + angle) / (2 * alpha));
+    int sector =
+      static_cast<int>(std::floor((theta + alpha + angle) / (2 * alpha)));
     double u_alpha = (theta - sector * 2 * alpha);
     double r_alpha = r_ * cos(alpha) / cos(u_alpha);
 
